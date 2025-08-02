@@ -6,7 +6,7 @@ Handles video capture and saving with timing markers.
 import cv2
 import numpy as np
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -77,6 +77,9 @@ class VideoRecorder:
             # Add timing overlay if this is the start frame
             if self.frame_count == 0:
                 bgr_frame = self.add_start_marker(bgr_frame)
+            
+            # Add continuous time overlay to every frame
+            bgr_frame = self.add_time_overlay(bgr_frame)
                 
             # Write frame
             self.writer.write(bgr_frame)
@@ -139,6 +142,49 @@ class VideoRecorder:
             print(f"Error adding start marker: {str(e)}")
             return frame
             
+    def add_time_overlay(self, frame: np.ndarray) -> np.ndarray:
+        """Add continuous time overlay to frame."""
+        try:
+            # Create a copy of the frame
+            marked_frame = frame.copy()
+            
+            # Calculate current time based on start time and frame count
+            if self.start_time is not None:
+                # Calculate elapsed time based on frame count and FPS
+                elapsed_seconds = self.frame_count / self.camera_fps
+                current_time = self.start_time + timedelta(seconds=elapsed_seconds)
+                timestamp = current_time.strftime("%H:%M:%S.%f")[:-3]
+            else:
+                # Fallback to current system time
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            
+            # Add time overlay text
+            text = f"Time: {timestamp}"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.0
+            thickness = 2
+            color = (255, 255, 255)  # White text
+            
+            # Get text size
+            (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+            
+            # Calculate position (top-left corner)
+            x = 20
+            y = text_height + 20
+            
+            # Add background rectangle for better visibility
+            cv2.rectangle(marked_frame, (x - 10, y - text_height - 10), 
+                         (x + text_width + 10, y + 10), (0, 0, 0), -1)
+            
+            # Add text
+            cv2.putText(marked_frame, text, (x, y), font, font_scale, color, thickness)
+            
+            return marked_frame
+            
+        except Exception as e:
+            print(f"Error adding time overlay: {str(e)}")
+            return frame
+            
     def add_finish_marker(self, frame: np.ndarray, finish_time: datetime) -> np.ndarray:
         """Add finish marker overlay to frame."""
         try:
@@ -155,8 +201,8 @@ class VideoRecorder:
             # Get text size
             (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
             
-            # Calculate position (bottom-right corner)
-            x = frame.shape[1] - text_width - 20
+            # Calculate position (bottom-left corner to avoid conflict with time overlay)
+            x = 20
             y = frame.shape[0] - 20
             
             # Add background rectangle
@@ -176,7 +222,7 @@ class VideoRecorder:
             (ts_width, ts_height), _ = cv2.getTextSize(timestamp_text, font, timestamp_font_scale, timestamp_thickness)
             
             # Calculate timestamp position (above finish marker)
-            ts_x = frame.shape[1] - ts_width - 20
+            ts_x = 20
             ts_y = y - 40
             
             # Add timestamp background
