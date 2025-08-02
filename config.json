@@ -1,0 +1,47 @@
+{
+  "camera": {
+    "default_camera": 0,
+    "resolution": "1280x720",
+    "fps": 30,
+    "auto_connect": true
+  },
+  "recording": {
+    "default_quality": "Medium (720p)",
+    "countdown_duration": 3,
+    "audio_enabled": true,
+    "auto_save": true,
+    "output_directory": "recordings"
+  },
+  "timing": {
+    "precision": "milliseconds",
+    "time_format": "24h",
+    "auto_clear": false
+  },
+  "webhook": {
+    "enabled": false,
+    "port": 8080,
+    "endpoint": "/finish",
+    "authentication": {
+      "enabled": false,
+      "api_key": ""
+    }
+  },
+  "ui": {
+    "theme": "dark",
+    "window_size": [
+      1200,
+      800
+    ],
+    "window_position": [
+      100,
+      100
+    ],
+    "show_tooltips": true
+  },
+  "advanced": {
+    "debug_mode": false,
+    "log_level": "INFO",
+    "backup_recordings": true,
+    "max_recordings": 100
+  }
+}

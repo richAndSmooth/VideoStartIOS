@@ -1,0 +1,206 @@
+"""
+Start Sequence Widget Module
+Handles the race start sequence with audio cues.
+"""
+
+import os
+import sys
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
+)
+from PyQt6.QtCore import QTimer, Qt, pyqtSignal, QUrl
+from PyQt6.QtGui import QFont, QPalette, QColor
+from PyQt6.QtMultimedia import QSoundEffect
+import random
+
+class StartSequenceWidget(QWidget):
+    """Widget for handling race start sequence with audio cues."""
+    
+    sequence_finished = pyqtSignal()
+    sequence_cancelled = pyqtSignal()
+    
+    def __init__(self, config: dict, audio_enabled: bool = True):
+        super().__init__()
+        self.config = config
+        self.audio_enabled = audio_enabled
+        self.current_step = 0
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.next_step)
+        
+        # Audio effects
+        self.audio_effects = {}
+        self.setup_audio()
+        
+        # Sequence steps
+        self.sequence_steps = [
+            ("go_to_start", "Go to the start", self.config.get('go_to_start_duration', 5)),
+            ("in_position", "In position", random.uniform(
+                self.config.get('in_position_min', 1.0),
+                self.config.get('in_position_max', 3.0)
+            )),
+            ("set", "Set", random.uniform(
+                self.config.get('set_min', 1.0),
+                self.config.get('set_max', 3.0)
+            )),
+            ("start_beep", "GO!", 0.1)
+        ]
+        
+        self.init_ui()
+        
+        # Test audio loading
+        print(f"Audio effects loaded: {list(self.audio_effects.keys())}")
+        print(f"Audio enabled: {self.audio_enabled}")
+        
+    def init_ui(self):
+        """Initialize the user interface."""
+        self.setWindowTitle("Race Start Sequence")
+        self.setFixedSize(500, 400)
+        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
+        
+        # Center the window on screen
+        screen = self.screen()
+        screen_geometry = screen.geometry()
+        x = (screen_geometry.width() - self.width()) // 2
+        y = (screen_geometry.height() - self.height()) // 2
+        self.move(x, y)
+        
+        # Set dark theme
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1a1a1a;
+                color: #ffffff;
+            }
+        """)
+        
+        # Create layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Title
+        title_label = QLabel("RACE START SEQUENCE")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #ff6b6b; margin-bottom: 20px;")
+        layout.addWidget(title_label)
+        
+        # Current step display
+        self.step_label = QLabel("")
+        self.step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.step_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        self.step_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                background-color: #2d2d2d;
+                border: 2px solid #555555;
+                border-radius: 10px;
+                padding: 20px;
+                margin: 20px 0;
+            }
+        """)
+        layout.addWidget(self.step_label)
+        
+        # Progress indicator
+        self.progress_label = QLabel("")
+        self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.progress_label.setFont(QFont("Arial", 14))
+        self.progress_label.setStyleSheet("color: #cccccc;")
+        layout.addWidget(self.progress_label)
+        
+        # Cancel button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        self.cancel_btn = QPushButton("Cancel Sequence")
+        self.cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                border: none;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        self.cancel_btn.clicked.connect(self.cancel_sequence)
+        button_layout.addWidget(self.cancel_btn)
+        
+        layout.addLayout(button_layout)
+        
+    def setup_audio(self):
+        """Setup audio effects for the sequence."""
+        if not self.audio_enabled:
+            return
+            
+        # Use WAV files from audio directory
+        audio_files = {
+            'go_to_start': 'audio/Go to the start (trump).wav',
+            'in_position': 'audio/In position (trump).wav',
+            'set': 'audio/Set (trump).wav',
+            'start_beep': 'audio/start_beep.wav'
+        }
+        
+        for key, file_path in audio_files.items():
+            if os.path.exists(file_path):
+                effect = QSoundEffect()
+                effect.setSource(QUrl.fromLocalFile(file_path))
+                effect.setVolume(1.0)  # Maximum volume
+                self.audio_effects[key] = effect
+                print(f"Loaded audio: {key} -> {file_path} (volume: 1.0)")
+            else:
+                print(f"Warning: Audio file not found: {file_path}")
+        
+    def start_sequence(self):
+        """Start the race start sequence."""
+        self.current_step = 0
+        self.next_step()
+        
+    def next_step(self):
+        """Move to the next step in the sequence."""
+        if self.current_step >= len(self.sequence_steps):
+            self.sequence_finished.emit()
+            self.close()
+            return
+            
+        step_key, step_text, duration = self.sequence_steps[self.current_step]
+        
+        # Update display
+        self.step_label.setText(step_text)
+        self.progress_label.setText(f"Step {self.current_step + 1} of {len(self.sequence_steps)}")
+        
+        # Play audio if available
+        if self.audio_enabled and step_key in self.audio_effects:
+            print(f"Playing audio: {step_key}")
+            self.audio_effects[step_key].play()
+        else:
+            print(f"Audio not available for: {step_key} (enabled: {self.audio_enabled}, has_effect: {step_key in self.audio_effects})")
+        
+        # Schedule next step
+        if duration > 0:
+            self.timer.singleShot(int(duration * 1000), self.next_step)
+        else:
+            # For the final "GO!" step, wait a bit then finish
+            self.timer.singleShot(100, self.next_step)
+        
+        self.current_step += 1
+        
+    def cancel_sequence(self):
+        """Cancel the start sequence."""
+        self.timer.stop()
+        self.sequence_cancelled.emit()
+        self.close()
+        
+    def showEvent(self, event):
+        """Override show event to start sequence automatically."""
+        super().showEvent(event)
+        self.start_sequence()
+        
+    def keyPressEvent(self, event):
+        """Handle key press events."""
+        if event.key() == Qt.Key.Key_Escape:
+            self.cancel_sequence()
+        else:
+            super().keyPressEvent(event)
