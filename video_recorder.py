@@ -13,19 +13,20 @@ from PyQt6.QtCore import QThread, pyqtSignal
 class VideoRecorder:
     """Handles video recording with timing markers."""
     
-    def __init__(self, output_path: str, quality: str = "Medium (720p)"):
+    def __init__(self, output_path: str, quality: str = "Medium (720p)", camera_fps: float = 30.0):
         self.output_path = output_path
         self.quality = quality
+        self.camera_fps = camera_fps
         self.writer = None
         self.is_recording = False
         self.frame_count = 0
         self.start_time = None
         
-        # Quality settings
+        # Quality settings (FPS will be overridden by camera_fps)
         self.quality_settings = {
-            "High (1080p)": {"width": 1920, "height": 1080, "fps": 30},
-            "Medium (720p)": {"width": 1280, "height": 720, "fps": 30},
-            "Low (480p)": {"width": 854, "height": 480, "fps": 30}
+            "High (1080p)": {"width": 1920, "height": 1080},
+            "Medium (720p)": {"width": 1280, "height": 720},
+            "Low (480p)": {"width": 854, "height": 480}
         }
         
     def start_recording(self):
@@ -43,7 +44,7 @@ class VideoRecorder:
             self.writer = cv2.VideoWriter(
                 self.output_path,
                 fourcc,
-                settings["fps"],
+                self.camera_fps,  # Use camera_fps here
                 (settings["width"], settings["height"])
             )
             
@@ -220,7 +221,7 @@ class VideoRecorder:
                 f.write(f"Recording Start: {self.start_time}\n")
                 f.write(f"Total Frames: {self.frame_count}\n")
                 f.write(f"Video Quality: {self.quality}\n")
-                f.write(f"Frame Rate: {self.quality_settings[self.quality]['fps']} fps\n")
+                f.write(f"Frame Rate: {self.camera_fps} fps\n")
                 f.write(f"Resolution: {self.quality_settings[self.quality]['width']}x{self.quality_settings[self.quality]['height']}\n")
                 
             print(f"Metadata saved to: {metadata_path}")

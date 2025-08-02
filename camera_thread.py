@@ -12,6 +12,7 @@ class CameraThread(QThread):
     """Thread for handling camera capture."""
     
     frame_ready = pyqtSignal(np.ndarray)
+    frame_ready_signal = pyqtSignal()  # Signal for frame recording
     error_occurred = pyqtSignal(str)
     
     def __init__(self):
@@ -34,6 +35,9 @@ class CameraThread(QThread):
                         # Convert BGR to RGB for Qt
                         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         self.frame_ready.emit(frame_rgb)
+                        
+                        # Signal that a new frame is available for recording
+                        self.frame_ready_signal.emit()
                     else:
                         # Frame read failed, try to reconnect
                         print("Frame read failed, attempting to reconnect...")
@@ -67,14 +71,29 @@ class CameraThread(QThread):
             camera = None
             for backend in backends:
                 try:
+                    print(f"Trying to connect to camera {camera_index} with backend {backend}...")
                     camera = cv2.VideoCapture(camera_index, backend)
+                    
+                    # Wait for camera to initialize (up to 10 seconds)
+                    import time
+                    start_time = time.time()
+                    while not camera.isOpened() and time.time() - start_time < 10:
+                        time.sleep(0.1)
+                    
                     if camera.isOpened():
+                        print(f"Camera opened with backend {backend}, testing frame read...")
                         # Test if we can actually read a frame
                         ret, test_frame = camera.read()
                         if ret and test_frame is not None:
                             self.camera = camera
+                            print(f"Camera {camera_index} connected successfully with backend {backend}")
                             break
                         else:
+                            print(f"Camera opened but frame read failed with backend {backend}")
+                            camera.release()
+                    else:
+                        print(f"Failed to open camera with backend {backend}")
+                        if camera:
                             camera.release()
                 except Exception as e:
                     print(f"Backend {backend} failed: {e}")
@@ -157,7 +176,46 @@ class CameraThread(QThread):
     def get_current_frame(self) -> Optional[np.ndarray]:
         """Get the current frame from camera (for recording)."""
         if self.camera is not None and self.camera.isOpened():
-            ret, frame = self.camera.read()
-            if ret:
-                return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        return None 
+            try:
+                ret, frame = self.camera.read()
+                if ret and frame is not None:
+                    return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            except Exception as e:
+                print(f"Error reading frame: {e}")
+        return None
+        
+    def get_camera_fps(self) -> float:
+        """Get the actual FPS of the connected camera."""
+        if self.camera is not None and self.camera.isOpened():
+            try:
+                # First, try to get the reported FPS
+                fps = self.camera.get(cv2.CAP_PROP_FPS)
+                print(f"Camera reported FPS: {fps}")
+                
+                # If FPS is 0 or invalid, use a reasonable default based on camera capabilities
+                if fps <= 0 or fps > 120:  # Also check for unreasonably high values
+                    # Instead of measuring (which interferes with the main thread),
+                    # use a reasonable default based on typical camera capabilities
+                    width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
+                    height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                    
+                    # Estimate FPS based on resolution
+                    if width >= 1920 or height >= 1080:
+                        fps = 30.0  # 1080p typically 30fps
+                    elif width >= 1280 or height >= 720:
+                        fps = 30.0  # 720p typically 30fps
+                    else:
+                        fps = 30.0  # Default to 30fps
+                    
+                    print(f"Using estimated FPS based on resolution: {fps}")
+                else:
+                    print(f"Using camera reported FPS: {fps}")
+                
+                # Ensure FPS is within reasonable bounds
+                fps = max(15.0, min(60.0, fps))  # Clamp between 15-60 FPS
+                return fps
+                
+            except Exception as e:
+                print(f"Error detecting FPS: {e}, using default")
+                return 30.0
+        return 30.0  # Default fallback 

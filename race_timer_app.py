@@ -371,6 +371,7 @@ class RaceTimerApp(QMainWindow):
         self.camera_thread = CameraThread()
         self.camera_thread.frame_ready.connect(self.update_camera_view)
         self.camera_thread.error_occurred.connect(self.handle_camera_error)
+        self.camera_thread.frame_ready_signal.connect(self.trigger_frame_recording)
         
         # Start camera thread
         self.camera_thread.start()
@@ -472,11 +473,19 @@ class RaceTimerApp(QMainWindow):
         """Handle start sequence completion and start recording."""
         self.is_sequence_active = False
         
-        # Initialize video recorder
+        # Initialize video recorder with camera's actual FPS
         output_path = self.get_output_path()
         quality = self.quality_combo.currentText()
         
-        self.video_recorder = VideoRecorder(output_path, quality)
+        # Wait for camera to be fully ready and get camera's actual FPS
+        import time
+        print("Waiting for camera to be ready...")
+        time.sleep(1)  # Give camera a moment to stabilize
+        
+        camera_fps = self.camera_thread.get_camera_fps()
+        print(f"Using camera FPS: {camera_fps}")
+        
+        self.video_recorder = VideoRecorder(output_path, quality, camera_fps)
         self.video_recorder.start_recording()
         
         # Mark start time
@@ -496,10 +505,9 @@ class RaceTimerApp(QMainWindow):
         self.recording_start_time = datetime.now()
         self.recording_timer.start(100)  # Update every 100ms
         
-        # Start frame recording timer
-        self.frame_timer = QTimer()
-        self.frame_timer.timeout.connect(self.record_current_frame)
-        self.frame_timer.start(33)  # ~30 FPS
+        # Start frame recording using camera's natural rate
+        # Instead of a timer, we'll record frames when they're available
+        self.frame_recording_active = True
         
     def on_sequence_cancelled(self):
         """Handle start sequence cancellation."""
@@ -516,8 +524,9 @@ class RaceTimerApp(QMainWindow):
         # Stop recording timers
         if hasattr(self, 'recording_timer'):
             self.recording_timer.stop()
-        if hasattr(self, 'frame_timer'):
-            self.frame_timer.stop()
+        
+        # Stop frame recording
+        self.frame_recording_active = False
             
         # Stop video recorder
         if self.video_recorder:
@@ -551,10 +560,15 @@ class RaceTimerApp(QMainWindow):
             
     def record_current_frame(self):
         """Record the current camera frame."""
-        if self.is_recording and self.video_recorder and self.camera_thread:
+        if self.is_recording and self.video_recorder and self.camera_thread and hasattr(self, 'frame_recording_active'):
             frame = self.camera_thread.get_current_frame()
             if frame is not None:
                 self.video_recorder.record_frame(frame)
+                
+    def trigger_frame_recording(self):
+        """Trigger frame recording when a new frame is available."""
+        if hasattr(self, 'frame_recording_active') and self.frame_recording_active:
+            self.record_current_frame()
             
     def get_output_path(self):
         """Get the output path for the video file."""
