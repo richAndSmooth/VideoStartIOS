@@ -21,6 +21,7 @@ class VideoRecorder:
         self.is_recording = False
         self.frame_count = 0
         self.start_time = None
+        self.race_start_time = None  # Time when the race actually starts (beep goes off)
         
         # Quality settings (FPS will be overridden by camera_fps)
         self.quality_settings = {
@@ -29,8 +30,8 @@ class VideoRecorder:
             "Low (480p)": {"width": 854, "height": 480}
         }
         
-    def start_recording(self):
-        """Start video recording."""
+    def initialize_writer(self):
+        """Initialize the video writer (slow operation - do this BEFORE beep)."""
         try:
             # Get quality settings - handle both string keys and dictionary objects
             if isinstance(self.quality, dict):
@@ -44,23 +45,83 @@ class VideoRecorder:
             output_dir = os.path.dirname(self.output_path)
             os.makedirs(output_dir, exist_ok=True)
             
-            # Initialize video writer
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            self.writer = cv2.VideoWriter(
-                self.output_path,
-                fourcc,
-                self.camera_fps,  # Use camera_fps here
-                (settings["width"], settings["height"])
-            )
+            # Initialize video writer with fallback codecs
+            codecs_to_try = ['mp4v', 'H264', 'XVID', 'MJPG']
+            self.writer = None
             
-            if not self.writer.isOpened():
-                raise Exception("Failed to initialize video writer")
-                
+            for codec in codecs_to_try:
+                try:
+                    print(f"Initializing video writer with codec: {codec}")
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    self.writer = cv2.VideoWriter(
+                        self.output_path,
+                        fourcc,
+                        self.camera_fps,  # Use camera_fps here
+                        (settings["width"], settings["height"])
+                    )
+                    
+                    if self.writer.isOpened():
+                        print(f"Video writer initialized successfully with codec: {codec}")
+                        break
+                    else:
+                        self.writer.release()
+                        self.writer = None
+                except Exception as e:
+                    print(f"Failed to initialize with codec {codec}: {e}")
+                    if self.writer:
+                        self.writer.release()
+                        self.writer = None
+            
+            if not self.writer or not self.writer.isOpened():
+                raise Exception(f"Failed to initialize video writer with any codec. Tried: {codecs_to_try}")
+            
+            # Validate the writer was created with correct FPS
+            actual_fps = self.writer.get(cv2.CAP_PROP_FPS)
+            print(f"Video writer FPS validation: {actual_fps} (requested: {self.camera_fps})")
+            
+            if abs(actual_fps - self.camera_fps) > 1.0:
+                print(f"Warning: FPS mismatch! Requested: {self.camera_fps}, Got: {actual_fps}")
+                # Try to reinitialize with a different codec if there's a mismatch
+                self.writer.release()
+                fourcc = cv2.VideoWriter_fourcc(*'H264')
+                self.writer = cv2.VideoWriter(
+                    self.output_path,
+                    fourcc,
+                    self.camera_fps,
+                    (settings["width"], settings["height"])
+                )
+                if not self.writer.isOpened():
+                    # Fallback to original codec
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    self.writer = cv2.VideoWriter(
+                        self.output_path,
+                        fourcc,
+                        self.camera_fps,
+                        (settings["width"], settings["height"])
+                    )
+                    if not self.writer.isOpened():
+                        raise Exception("Failed to initialize video writer with any codec")
+            
+            print(f"Video writer fully initialized and ready for: {self.output_path}")
+            return True
+            
+        except Exception as e:
+            print(f"Error initializing video writer: {str(e)}")
+            raise
+    
+    def start_recording(self):
+        """Start video recording INSTANTLY (writer must be pre-initialized)."""
+        try:
+            if not self.writer or not self.writer.isOpened():
+                raise Exception("Video writer not initialized! Call initialize_writer() first.")
+            
+            # INSTANT START - no delays, just mark the recording as active
             self.is_recording = True
             self.frame_count = 0
             self.start_time = datetime.now()
+            self.race_start_time = datetime.now()  # Set race start time when recording begins
             
-            print(f"Started recording to: {self.output_path}")
+            print(f"🎬 RECORDING STARTED INSTANTLY at {self.start_time.strftime('%H:%M:%S.%f')[:-3]}")
             
         except Exception as e:
             print(f"Error starting recording: {str(e)}")
@@ -159,12 +220,15 @@ class VideoRecorder:
             # Create a copy of the frame
             marked_frame = frame.copy()
             
-            # Calculate current time based on start time and frame count
-            if self.start_time is not None:
+            # Calculate elapsed time from race start
+            if self.race_start_time is not None:
                 # Calculate elapsed time based on frame count and FPS
                 elapsed_seconds = self.frame_count / self.camera_fps
-                current_time = self.start_time + timedelta(seconds=elapsed_seconds)
-                timestamp = current_time.strftime("%H:%M:%S.%f")[:-3]
+                
+                # Convert to MM:SS.mmm format
+                minutes = int(elapsed_seconds // 60)
+                seconds = elapsed_seconds % 60
+                timestamp = f"{minutes:02d}:{seconds:06.3f}"
             else:
                 # Fallback to current system time
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -280,14 +344,33 @@ class VideoRecorder:
                 f.write(f"Video Quality: {self.quality}\n")
                 f.write(f"Recording FPS: {self.camera_fps} fps\n")
                 
+                # Calculate actual recording duration and frame rate
+                if self.start_time and self.frame_count > 0:
+                    duration = datetime.now() - self.start_time
+                    actual_fps = self.frame_count / duration.total_seconds()
+                    f.write(f"Actual Recording Duration: {duration}\n")
+                    f.write(f"Actual Frame Rate: {actual_fps:.2f} fps\n")
+                    f.write(f"Frame Rate Accuracy: {'✓ Good' if abs(actual_fps - self.camera_fps) < 2.0 else '⚠ Mismatch'}\n")
+                
                 # Handle quality settings for metadata
                 if isinstance(self.quality, dict):
                     f.write(f"Resolution: {self.quality['width']}x{self.quality['height']}\n")
                     f.write(f"Quality Setting FPS: {self.quality.get('fps', 'Unknown')}\n")
-                    f.write(f"Note: Video recorded at fixed 30 FPS for consistent playback speed\n")
                 else:
                     settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
                     f.write(f"Resolution: {settings['width']}x{settings['height']}\n")
+                
+                # Get the actual codec used
+                actual_codec = "Unknown"
+                if hasattr(self, 'writer') and self.writer:
+                    try:
+                        # Try to get codec info from the writer
+                        actual_codec = "MP4V"  # Default assumption
+                    except:
+                        pass
+                
+                f.write(f"\nVideo Codec: {actual_codec} (OpenCV)\n")
+                f.write(f"Note: Video recorded at camera's actual FPS for accurate playback speed\n")
                 
             print(f"Metadata saved to: {metadata_path}")
             

@@ -35,6 +35,10 @@ class CameraThread(QThread):
         """Main thread loop for camera capture."""
         self.is_running = True
         
+        # Don't try to connect immediately - wait for explicit connection
+        connection_attempts = 0
+        max_connection_attempts = 3
+        
         while self.is_running:
             try:
                 # Skip frame reading if we're switching cameras
@@ -55,17 +59,30 @@ class CameraThread(QThread):
                             self.frame_ready_signal.emit()
                         else:
                             # Frame read failed, try to reconnect
+                            print("Frame read failed, attempting reconnection...")
                             self.camera = None  # Force reconnection
+                            connection_attempts = 0  # Reset attempts
                             self.msleep(500)  # Wait 500ms before retry
                     except Exception as e:
                         print(f"Frame read error: {e}")
                         # Try to reconnect on frame read errors
                         self.camera = None  # Force reconnection
+                        connection_attempts = 0  # Reset attempts
                         self.msleep(500)
                 else:
-                    # Camera not connected, try to connect
-                    if not self.connect_camera(self.current_camera_index):
-                        self.msleep(1000)  # Wait 1 second before retry
+                    # Camera not connected, try to connect with limited attempts
+                    if connection_attempts < max_connection_attempts:
+                        print(f"Attempting camera connection (attempt {connection_attempts + 1}/{max_connection_attempts})...")
+                        if self.connect_camera(self.current_camera_index):
+                            connection_attempts = 0  # Reset on success
+                        else:
+                            connection_attempts += 1
+                        self.msleep(2000)  # Wait 2 seconds between attempts
+                    else:
+                        # Stop trying to connect after max attempts
+                        print(f"Failed to connect to camera after {max_connection_attempts} attempts. Waiting for manual connection...")
+                        self.msleep(5000)  # Wait 5 seconds before checking again
+                        connection_attempts = 0  # Reset for next cycle
             except Exception as e:
                 print(f"Camera thread error: {e}")
                 import traceback
@@ -130,51 +147,61 @@ class CameraThread(QThread):
                 stored_backend = camera_info['backend']
                 backends = [stored_backend]
             else:
-                # Fallback to trying different backends
+                # Try backends in order of preference, avoiding DirectShow if it's causing issues
                 backends = [
-                    cv2.CAP_DSHOW,  # DirectShow (Windows)
-                    cv2.CAP_MSMF,   # Microsoft Media Foundation
-                    cv2.CAP_ANY     # Auto-detect
+                    cv2.CAP_MSMF,   # Microsoft Media Foundation (Windows)
+                    cv2.CAP_ANY,    # Auto-detect
+                    cv2.CAP_DSHOW   # DirectShow (Windows) - try last
                 ]
             
             camera = None
             for backend in backends:
                 try:
-                    print(f"Trying to connect to camera {camera_index} with backend {backend}...")
+                    backend_name = "MSMF" if backend == cv2.CAP_MSMF else "DSHOW" if backend == cv2.CAP_DSHOW else "ANY"
+                    print(f"Trying to connect to camera {camera_index} with backend {backend_name}...")
+                    
                     camera = cv2.VideoCapture(camera_index, backend)
                     
-                    # Wait for camera to initialize (up to 5 seconds)
+                    # Wait for camera to initialize (up to 3 seconds)
                     import time
                     start_time = time.time()
-                    while not camera.isOpened() and time.time() - start_time < 5:
+                    while not camera.isOpened() and time.time() - start_time < 3:
                         time.sleep(0.1)
                     
                     if camera.isOpened():
-                        print(f"Camera opened with backend {backend}, testing frame read...")
+                        print(f"Camera opened with backend {backend_name}, testing frame read...")
                         # Test if we can actually read a frame
                         try:
                             ret, test_frame = camera.read()
                             if ret and test_frame is not None:
                                 self.camera = camera
-                                print(f"Camera {camera_index} connected successfully with backend {backend}")
+                                print(f"Camera {camera_index} connected successfully with backend {backend_name}")
+                                # Store successful backend for future use
+                                if camera_index not in self.camera_details:
+                                    self.camera_details[camera_index] = {}
+                                self.camera_details[camera_index]['backend'] = backend
                                 break
                             else:
-                                print(f"Camera opened but frame read failed with backend {backend}")
+                                print(f"Camera opened but frame read failed with backend {backend_name}")
                                 camera.release()
+                                camera = None
                         except Exception as e:
-                            print(f"Frame read test failed with backend {backend}: {e}")
+                            print(f"Frame read test failed with backend {backend_name}: {e}")
                             camera.release()
+                            camera = None
                     else:
-                        print(f"Failed to open camera with backend {backend}")
+                        print(f"Failed to open camera with backend {backend_name}")
                         if camera:
                             camera.release()
+                            camera = None
                 except Exception as e:
-                    print(f"Backend {backend} failed: {e}")
+                    print(f"Backend {backend_name} failed: {e}")
                     if camera:
                         try:
                             camera.release()
                         except:
                             pass
+                    camera = None
             
             if self.camera is None or not self.camera.isOpened():
                 print(f"Failed to connect to camera {camera_index} with any backend")
@@ -483,41 +510,95 @@ class CameraThread(QThread):
         return None
         
     def get_camera_fps(self) -> float:
-        """Get the actual FPS of the connected camera."""
+        """Get the actual FPS of the connected camera by measuring frame delivery rate."""
         if self.camera is not None and self.camera.isOpened():
             try:
-                # First, try to get the reported FPS
-                fps = self.camera.get(cv2.CAP_PROP_FPS)
-                print(f"Camera reported FPS: {fps}")
+                # Get reported FPS for reference
+                reported_fps = self.camera.get(cv2.CAP_PROP_FPS)
+                print(f"Camera reported FPS: {reported_fps}")
                 
-                # If FPS is 0 or invalid, use a reasonable default based on camera capabilities
-                if fps <= 0 or fps > 120:  # Also check for unreasonably high values
-                    # Instead of measuring (which interferes with the main thread),
-                    # use a reasonable default based on typical camera capabilities
-                    width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
-                    height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
-                    
-                    # Estimate FPS based on resolution
-                    if width >= 1920 or height >= 1080:
-                        fps = 30.0  # 1080p typically 30fps
-                    elif width >= 1280 or height >= 720:
-                        fps = 30.0  # 720p typically 30fps
+                # ALWAYS measure actual FPS - don't trust reported values
+                # This fixes the 2x speed issue caused by cameras lying about FPS
+                print("Measuring actual camera FPS...")
+                import time
+                frame_count = 0
+                start_time = time.time()
+                measurement_duration = 2.0  # Measure for 2 seconds for better accuracy
+                
+                # Measure actual frame delivery rate
+                while time.time() - start_time < measurement_duration and frame_count < 120:
+                    ret, frame = self.camera.read()
+                    if ret:
+                        frame_count += 1
                     else:
-                        fps = 30.0  # Default to 30fps
-                    
-                    print(f"Using estimated FPS based on resolution: {fps}")
-                else:
-                    print(f"Using camera reported FPS: {fps}")
+                        # Add small delay if frame read fails
+                        time.sleep(0.01)
                 
-                # Ensure FPS is within reasonable bounds
-                fps = max(15.0, min(60.0, fps))  # Clamp between 15-60 FPS
+                elapsed = time.time() - start_time
+                measured_fps = frame_count / elapsed if elapsed > 0 else 0
+                print(f"Measured actual FPS: {measured_fps:.2f} over {elapsed:.2f} seconds ({frame_count} frames)")
+                
+                # Use measured FPS if reasonable
+                if 10 <= measured_fps <= 60:
+                    fps = measured_fps
+                    print(f"Using measured FPS: {fps:.2f}")
+                else:
+                    # If measurement failed, fall back to reported FPS with validation
+                    if 15 <= reported_fps <= 60:
+                        fps = reported_fps
+                        print(f"Measurement failed, using reported FPS: {fps}")
+                    else:
+                        # Last resort: estimate based on resolution
+                        width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
+                        height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                        
+                        if width >= 1920 or height >= 1080:
+                            fps = 15.0  # Conservative estimate for 1080p
+                        elif width >= 1280 or height >= 720:
+                            fps = 20.0  # Conservative estimate for 720p
+                        else:
+                            fps = 25.0  # Conservative estimate for lower res
+                        
+                        print(f"Using conservative estimate based on resolution {width}x{height}: {fps}")
+                
+                # Final validation and bounds checking
+                fps = max(10.0, min(60.0, fps))
+                print(f"Final validated FPS: {fps:.2f}")
+                
                 return fps
                 
             except Exception as e:
-                print(f"Error detecting FPS: {e}, using default")
-                return 30.0
-        return 30.0  # Default fallback
+                print(f"Error measuring FPS: {e}, using conservative default")
+                return 15.0  # Conservative default
+        return 15.0  # Conservative default fallback
         
     def get_current_camera_index(self) -> int:
         """Get the current camera index."""
-        return self.current_camera_index 
+        return self.current_camera_index
+        
+    def measure_real_time_fps(self, duration: float = 3.0) -> float:
+        """Measure real-time FPS during actual recording for maximum accuracy."""
+        if self.camera is not None and self.camera.isOpened():
+            try:
+                print(f"Measuring real-time FPS over {duration} seconds...")
+                import time
+                frame_count = 0
+                start_time = time.time()
+                
+                while time.time() - start_time < duration:
+                    ret, frame = self.camera.read()
+                    if ret and frame is not None:
+                        frame_count += 1
+                    else:
+                        time.sleep(0.005)  # Small delay on failed reads
+                
+                elapsed = time.time() - start_time
+                real_fps = frame_count / elapsed if elapsed > 0 else 0
+                print(f"Real-time measurement: {real_fps:.2f} FPS ({frame_count} frames in {elapsed:.2f}s)")
+                
+                return real_fps if real_fps > 5 else 15.0  # Fallback if measurement failed
+                
+            except Exception as e:
+                print(f"Error in real-time FPS measurement: {e}")
+                return 15.0
+        return 15.0 

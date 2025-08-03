@@ -18,6 +18,7 @@ class StartSequenceWidget(QWidget):
     
     sequence_finished = pyqtSignal()
     sequence_cancelled = pyqtSignal()
+    start_beep_played = pyqtSignal()  # New signal for precise timing
     
     def __init__(self, config: dict, audio_enabled: bool = True):
         super().__init__()
@@ -171,19 +172,31 @@ class StartSequenceWidget(QWidget):
         self.step_label.setText(step_text)
         self.progress_label.setText(f"Step {self.current_step + 1} of {len(self.sequence_steps)}")
         
-        # Play audio if available
+        # Special handling for start_beep step - TRULY SIMULTANEOUS audio and signal
+        if step_key == "start_beep":
+            print("🎵 SIMULTANEOUS BEEP AND RECORDING START!")
+            
+            # For maximum synchronization: start audio and emit signal in rapid succession
+            if self.audio_enabled and step_key in self.audio_effects:
+                # Start audio first (it has its own buffering delay)
+                self.audio_effects[step_key].play()
+                print(f"Beep audio started")
+            
+            # Emit signal immediately after audio starts (they're now truly synchronized)
+            self.start_beep_played.emit()  
+            print(f"Recording signal emitted - SYNCHRONIZED with beep audio")
+            
+            # Emit sequence_finished for UI updates (happens slightly after)
+            self.sequence_finished.emit()
+            self.close()
+            return
+        
+        # Play audio for other steps (normal flow)
         if self.audio_enabled and step_key in self.audio_effects:
             print(f"Playing audio: {step_key}")
             self.audio_effects[step_key].play()
         else:
             print(f"Audio not available for: {step_key} (enabled: {self.audio_enabled}, has_effect: {step_key in self.audio_effects})")
-        
-        # Special handling for start_beep step - emit signal immediately
-        if step_key == "start_beep":
-            print("Start beep played - emitting sequence_finished immediately")
-            self.sequence_finished.emit()
-            self.close()
-            return
         
         # Schedule next step for other steps
         if duration > 0:

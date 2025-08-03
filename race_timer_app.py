@@ -69,7 +69,8 @@ class RaceTimerApp(QMainWindow):
         self.setCursor(Qt.CursorShape.ArrowCursor)
         
         # Initialize camera list in background thread to prevent UI blocking
-        QTimer.singleShot(100, self.start_camera_scan)
+        # Delay this to prevent startup crashes
+        QTimer.singleShot(2000, self.start_camera_scan)
         
     def init_start_sequence_config(self):
         """Initialize start sequence configuration with defaults."""
@@ -124,6 +125,9 @@ class RaceTimerApp(QMainWindow):
                 # Update camera info display in background
                 QTimer.singleShot(50, self.update_camera_info_display_async)
                 
+                # Auto-select the first camera after a short delay
+                QTimer.singleShot(500, self.auto_select_first_camera)
+                
         except Exception as e:
             print(f"Error handling cameras ready: {e}")
             self.camera_combo.addItem("Error loading cameras")
@@ -137,6 +141,18 @@ class RaceTimerApp(QMainWindow):
             
             # Ensure cursor is restored to normal
             self.setCursor(Qt.CursorShape.ArrowCursor)
+            
+    def auto_select_first_camera(self):
+        """Automatically select the first available camera."""
+        try:
+            if self.camera_thread and self.camera_combo.count() > 0:
+                # Don't auto-select if it's a placeholder item
+                first_item = self.camera_combo.itemText(0)
+                if first_item not in ["No cameras found", "Camera scan failed", "Scanning cameras..."]:
+                    print("Auto-selecting first camera...")
+                    self.change_camera()
+        except Exception as e:
+            print(f"Error in auto_select_first_camera: {e}")
                 
     def on_camera_scan_error(self, error_message):
         """Handle camera scan errors."""
@@ -184,6 +200,7 @@ class RaceTimerApp(QMainWindow):
                     info_text += f"""
   Current Resolution: {width}x{height}
   Current FPS: {fps}
+  Actual Camera FPS: {self.camera_thread.get_camera_fps():.1f}
   Supported Resolutions: {', '.join(resolutions) if resolutions else 'Unknown'}"""
                     
                     if combinations:
@@ -543,8 +560,8 @@ class RaceTimerApp(QMainWindow):
             self.camera_thread.error_occurred.connect(self.handle_camera_error)
             self.camera_thread.frame_ready_signal.connect(self.trigger_frame_recording)
             
-            # Start camera thread with a delay to ensure UI is ready
-            QTimer.singleShot(1000, self.camera_thread.start)
+            # Don't start camera thread immediately - wait for user to select a camera
+            # This prevents startup crashes from camera initialization issues
             
         except Exception as e:
             print(f"Error setting up camera: {e}")
@@ -605,6 +622,11 @@ class RaceTimerApp(QMainWindow):
         try:
             if self.camera_thread and self.camera_combo.currentIndex() >= 0:
                 camera_index = self.camera_combo.currentIndex()
+                
+                # Start camera thread if not already running
+                if not self.camera_thread.isRunning():
+                    print("Starting camera thread...")
+                    self.camera_thread.start()
                 
                 # Get camera details for better feedback
                 camera_info = self.camera_thread.get_camera_info(camera_index)
@@ -737,6 +759,32 @@ class RaceTimerApp(QMainWindow):
         if self.quality_combo.count() <= 1:  # Only if still showing "Loading..." or empty
             self.update_quality_options()
             
+        # PRE-MEASURE camera FPS and initialize video recorder BEFORE sequence starts
+        # This ensures recording starts immediately when the beep plays
+        print("Pre-measuring camera FPS for synchronized recording...")
+        self.status_label.setText("Measuring camera FPS...")
+        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffc107;")
+        
+        output_path = self.get_output_path()
+        quality_data = self.quality_combo.currentData()
+        
+        # Measure FPS now (before sequence starts)
+        actual_camera_fps = self.camera_thread.measure_real_time_fps(2.0)
+        print(f"Pre-measured camera FPS: {actual_camera_fps:.2f}")
+        
+        # Validate FPS is reasonable
+        if actual_camera_fps < 10 or actual_camera_fps > 60:
+            print(f"Warning: Unusual FPS detected ({actual_camera_fps:.2f}), using fallback")
+            actual_camera_fps = 15.0  # Safe fallback
+        
+        # Initialize video recorder now (but don't start recording yet)
+        self.video_recorder = VideoRecorder(output_path, quality_data, actual_camera_fps)
+        
+        # Pre-initialize the video writer (slow operation done BEFORE beep)
+        print("Pre-initializing video writer for instant recording start...")
+        self.video_recorder.initialize_writer()
+        print("✅ Video writer fully ready - recording will start instantly with beep")
+            
         # Show recording in progress message
         self.show_recording_message("Start sequence in progress...")
             
@@ -747,6 +795,7 @@ class RaceTimerApp(QMainWindow):
         )
         self.start_sequence_widget.sequence_finished.connect(self.on_sequence_finished)
         self.start_sequence_widget.sequence_cancelled.connect(self.on_sequence_cancelled)
+        self.start_sequence_widget.start_beep_played.connect(self.on_start_beep_played)
         
         # Show start sequence
         self.start_sequence_widget.show()
@@ -756,30 +805,28 @@ class RaceTimerApp(QMainWindow):
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffc107;")
         
     def on_sequence_finished(self):
-        """Handle start sequence completion and start recording."""
+        """Handle start sequence completion - recording already started with beep."""
         self.is_sequence_active = False
         
         # Show recording in progress message
         self.show_recording_message("Recording in progress...")
         
-        # Initialize video recorder with fixed 30 FPS for consistent playback
-        output_path = self.get_output_path()
-        quality_data = self.quality_combo.currentData() # Get the selected quality data
+        # Recording should already be started by on_start_beep_played()
+        # Just update UI and start timers
+        if not self.is_recording:
+            print("WARNING: Recording not started by beep signal - starting now as fallback")
+            if self.video_recorder:
+                self.video_recorder.start_recording()
+                self.is_recording = True
+                # Mark start time as fallback
+                start_time = datetime.now()
+                self.timing_markers.set_start_time(start_time)
+                self.start_time_label.setText(f"Start: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
+                self.frame_recording_active = True
         
-        # Use fixed 30 FPS for consistent video playback speed
-        recording_fps = 30.0
-        print(f"Using fixed recording FPS: {recording_fps}")
-        
-        self.video_recorder = VideoRecorder(output_path, quality_data, recording_fps)
-        self.video_recorder.start_recording()
-        
-        # Mark start time
-        start_time = datetime.now()
-        self.timing_markers.set_start_time(start_time)
-        self.start_time_label.setText(f"Start: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
+        print("Sequence finished - updating UI for recording")
         
         # Update UI
-        self.is_recording = True
         self.stop_btn.setEnabled(True)
         self.status_label.setText("Recording...")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
@@ -789,14 +836,36 @@ class RaceTimerApp(QMainWindow):
         self.recording_timer.timeout.connect(self.update_recording_time)
         self.recording_start_time = datetime.now()
         self.recording_timer.start(100)  # Update every 100ms
+            
+    def on_start_beep_played(self):
+        """Handle the exact moment when the start beep is played - INSTANTANEOUS START."""
+        # Mark the EXACT start time FIRST (before any processing delays)
+        beep_start_time = datetime.now()
+        print(f"🎵 BEEP SIGNAL RECEIVED! Recording starting NOW at {beep_start_time.strftime('%H:%M:%S.%f')[:-3]}")
         
-        # Start frame recording using camera's natural rate
-        # Instead of a timer, we'll record frames when they're available
-        self.frame_recording_active = True
+        # Start recording IMMEDIATELY - no delays, no extra logging
+        if self.video_recorder and not self.is_recording:
+            self.video_recorder.start_recording()
+            self.frame_recording_active = True
+            self.is_recording = True
+            
+            # Set timing markers with the precise beep moment
+            self.timing_markers.set_start_time(beep_start_time)
+            self.start_time_label.setText(f"Start: {beep_start_time.strftime('%H:%M:%S.%f')[:-3]}")
+            
+            print(f"✅ Recording started instantaneously with beep at: {beep_start_time}")
+        else:
+            print(f"❌ ERROR: Video recorder not ready or already recording")
             
     def on_sequence_cancelled(self):
         """Handle start sequence cancellation."""
         self.is_sequence_active = False
+        
+        # Clean up pre-initialized video recorder if sequence was cancelled
+        if hasattr(self, 'video_recorder') and self.video_recorder:
+            print("Cleaning up pre-initialized video recorder (sequence cancelled)")
+            self.video_recorder = None
+        
         self.restore_camera_view()
         self.start_btn.setEnabled(True)
         self.status_label.setText("Ready")
@@ -857,6 +926,21 @@ class RaceTimerApp(QMainWindow):
         if self.is_recording and self.video_recorder and self.camera_thread and hasattr(self, 'frame_recording_active'):
             frame = self.camera_thread.get_current_frame()
             if frame is not None:
+                # Add frame recording timing validation
+                if not hasattr(self, 'last_frame_time'):
+                    self.last_frame_time = datetime.now()
+                    self.frame_count = 0
+                
+                current_time = datetime.now()
+                self.frame_count += 1
+                
+                # Log frame recording timing every 30 frames (about 1 second at 30fps)
+                if self.frame_count % 30 == 0:
+                    elapsed = (current_time - self.last_frame_time).total_seconds()
+                    actual_fps = 30 / elapsed if elapsed > 0 else 0
+                    print(f"Frame recording timing: {actual_fps:.2f} fps (expected: ~30fps)")
+                    self.last_frame_time = current_time
+                
                 self.video_recorder.record_frame(frame)
                 
     def trigger_frame_recording(self):
