@@ -26,6 +26,24 @@ from video_recorder import VideoRecorder
 from timing_markers import TimingMarkers
 from config_manager import ConfigManager
 
+class CameraScanThread(QThread):
+    """Background thread for scanning cameras to prevent UI blocking."""
+    cameras_ready = pyqtSignal(list)  # Signal with list of camera names
+    camera_info_ready = pyqtSignal(dict)  # Signal with camera info
+    scan_error = pyqtSignal(str)  # Signal for scan errors
+    
+    def __init__(self, camera_thread):
+        super().__init__()
+        self.camera_thread = camera_thread
+        
+    def run(self):
+        """Scan cameras in background thread."""
+        try:
+            cameras = self.camera_thread.get_available_cameras()
+            self.cameras_ready.emit(cameras)
+        except Exception as e:
+            self.scan_error.emit(str(e))
+
 class RaceTimerApp(QMainWindow):
     """Main application window for race timing."""
     
@@ -38,6 +56,7 @@ class RaceTimerApp(QMainWindow):
         self.start_sequence_widget = None
         self.is_recording = False
         self.is_sequence_active = False
+        self.camera_scan_thread = None
         
         # Initialize start sequence configuration
         self.init_start_sequence_config()
@@ -46,8 +65,11 @@ class RaceTimerApp(QMainWindow):
         self.setup_camera()
         self.connect_camera_signals()
         
-        # Initialize camera list after UI is fully set up
-        QTimer.singleShot(100, self.refresh_cameras)
+        # Ensure cursor is set to normal initially
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        
+        # Initialize camera list in background thread to prevent UI blocking
+        QTimer.singleShot(100, self.start_camera_scan)
         
     def init_start_sequence_config(self):
         """Initialize start sequence configuration with defaults."""
@@ -60,6 +82,126 @@ class RaceTimerApp(QMainWindow):
             'set_max': self.config.get('set_max', 3.0),
             'audio_enabled': self.config.get('audio_enabled', True)
         }
+        
+    def start_camera_scan(self):
+        """Start camera scanning in background thread."""
+        if self.camera_thread:
+            self.camera_scan_thread = CameraScanThread(self.camera_thread)
+            self.camera_scan_thread.cameras_ready.connect(self.on_cameras_ready)
+            self.camera_scan_thread.scan_error.connect(self.on_camera_scan_error)
+            self.camera_scan_thread.start()
+            
+            # Show scanning status
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("Scanning cameras...")
+                self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffc107;")
+            if hasattr(self, 'camera_combo'):
+                self.camera_combo.clear()
+                self.camera_combo.addItem("Scanning cameras...")
+            if hasattr(self, 'refresh_btn'):
+                self.refresh_btn.setEnabled(False)
+                self.refresh_btn.setText("Scanning...")
+                
+    def on_cameras_ready(self, cameras):
+        """Handle camera scan completion."""
+        try:
+            self.camera_combo.clear()
+            
+            if not cameras:
+                self.camera_combo.addItem("No cameras found")
+                self.status_label.setText("No cameras detected")
+                self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
+                if hasattr(self, 'camera_info_label'):
+                    self.camera_info_label.setText("No cameras available")
+            else:
+                for i, camera_info in enumerate(cameras):
+                    self.camera_combo.addItem(camera_info)
+                    
+                self.camera_combo.setCurrentIndex(0)
+                self.status_label.setText(f"Found {len(cameras)} camera(s)")
+                self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #28a745;")
+                
+                # Update camera info display in background
+                QTimer.singleShot(50, self.update_camera_info_display_async)
+                
+        except Exception as e:
+            print(f"Error handling cameras ready: {e}")
+            self.camera_combo.addItem("Error loading cameras")
+            self.status_label.setText("Camera load failed")
+            self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
+        finally:
+            # Re-enable refresh button
+            if hasattr(self, 'refresh_btn'):
+                self.refresh_btn.setEnabled(True)
+                self.refresh_btn.setText("Refresh")
+            
+            # Ensure cursor is restored to normal
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+                
+    def on_camera_scan_error(self, error_message):
+        """Handle camera scan errors."""
+        print(f"Camera scan error: {error_message}")
+        self.camera_combo.clear()
+        self.camera_combo.addItem("Camera scan failed")
+        self.status_label.setText("Camera scan failed")
+        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
+        if hasattr(self, 'refresh_btn'):
+            self.refresh_btn.setEnabled(True)
+            self.refresh_btn.setText("Refresh")
+        
+        # Ensure cursor is restored to normal
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+            
+    def update_camera_info_display_async(self):
+        """Update camera info display asynchronously to prevent blocking."""
+        try:
+            if not hasattr(self, 'camera_info_label'):
+                return
+                
+            camera_index = self.camera_combo.currentIndex()
+            if camera_index < 0:
+                self.camera_info_label.setText("No camera selected")
+                return
+                
+            # Get camera info from thread (this should be fast since cameras are already scanned)
+            camera_info = self.camera_thread.get_camera_info(camera_index)
+            if camera_info:
+                info_text = f"""Camera Details:
+  Name: {camera_info.get('name', 'Unknown')}
+  Index: {camera_info.get('index', 'Unknown')}
+  Backend: {camera_info.get('backend', 'Unknown')}
+
+  Capabilities:"""
+                
+                capabilities = camera_info.get('capabilities', {})
+                if capabilities:
+                    width = capabilities.get('width', 0)
+                    height = capabilities.get('height', 0)
+                    fps = capabilities.get('fps', 0)
+                    resolutions = capabilities.get('supported_resolutions', [])
+                    combinations = capabilities.get('supported_combinations', [])
+                    
+                    info_text += f"""
+  Current Resolution: {width}x{height}
+  Current FPS: {fps}
+  Supported Resolutions: {', '.join(resolutions) if resolutions else 'Unknown'}"""
+                    
+                    if combinations:
+                        info_text += "\n  Supported Quality Options:"
+                        for combo in combinations:
+                            info_text += f"\n    • {combo['display_name']}"
+                    else:
+                        info_text += "\n  No quality options detected"
+                else:
+                    info_text += "\n  No capability information available"
+                    
+                self.camera_info_label.setText(info_text)
+            else:
+                self.camera_info_label.setText("Camera information not available")
+                
+        except Exception as e:
+            print(f"Error in update_camera_info_display_async(): {e}")
+            self.camera_info_label.setText("Error loading camera information")
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -418,43 +560,13 @@ class RaceTimerApp(QMainWindow):
     def refresh_cameras(self):
         """Refresh the list of available cameras."""
         try:
-            self.camera_combo.clear()
-            
-            if self.camera_thread is None:
-                self.camera_combo.addItem("Camera not initialized")
-                return
-                
-            # Disable refresh button temporarily to prevent multiple calls
-            if hasattr(self, 'refresh_btn'):
-                self.refresh_btn.setEnabled(False)
-                self.refresh_btn.setText("Scanning...")
-            
             # Don't allow camera refresh during recording
             if self.is_recording or self.is_sequence_active:
                 self.camera_combo.addItem("Camera refresh not available during recording")
-                if hasattr(self, 'refresh_btn'):
-                    self.refresh_btn.setEnabled(True)
-                    self.refresh_btn.setText("Refresh")
                 return
                 
-            cameras = self.camera_thread.get_available_cameras()
-            
-            if not cameras:
-                self.camera_combo.addItem("No cameras found")
-                self.status_label.setText("No cameras detected")
-                self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
-                if hasattr(self, 'camera_info_label'):
-                    self.camera_info_label.setText("No cameras available")
-            else:
-                for i, camera_info in enumerate(cameras):
-                    self.camera_combo.addItem(camera_info)
-                    
-                self.camera_combo.setCurrentIndex(0)
-                self.status_label.setText(f"Found {len(cameras)} camera(s)")
-                self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #28a745;")
-                # Update camera info display for the first camera
-                self.update_camera_info_display()
-                # Don't update quality options immediately - let user do it manually
+            # Use background thread for camera scanning
+            self.start_camera_scan()
                 
         except Exception as e:
             print(f"Error refreshing cameras: {e}")
@@ -463,7 +575,6 @@ class RaceTimerApp(QMainWindow):
             self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
             if hasattr(self, 'camera_info_label'):
                 self.camera_info_label.setText(f"Error: {str(e)}")
-        finally:
             # Re-enable refresh button
             if hasattr(self, 'refresh_btn'):
                 self.refresh_btn.setEnabled(True)
@@ -509,8 +620,8 @@ class RaceTimerApp(QMainWindow):
                 # Switch the camera
                 self.camera_thread.change_camera(camera_index)
                 
-                # Update camera info display immediately
-                self.update_camera_info_display()
+                # Update camera info display asynchronously to prevent blocking
+                QTimer.singleShot(100, self.update_camera_info_display_async)
                 
                 # Update status after a short delay
                 QTimer.singleShot(2000, self.update_camera_status)
@@ -587,54 +698,8 @@ class RaceTimerApp(QMainWindow):
             
     def update_camera_info_display(self):
         """Update the camera information display."""
-        try:
-            if not hasattr(self, 'camera_info_label'):
-                return
-                
-            camera_index = self.camera_combo.currentIndex()
-            if camera_index < 0:
-                self.camera_info_label.setText("No camera selected")
-                return
-                
-            camera_info = self.camera_thread.get_camera_info(camera_index)
-            if camera_info:
-                info_text = f"""Camera Details:
-  Name: {camera_info.get('name', 'Unknown')}
-  Index: {camera_info.get('index', 'Unknown')}
-  Backend: {camera_info.get('backend', 'Unknown')}
-
-  Capabilities:"""
-                
-                capabilities = camera_info.get('capabilities', {})
-                if capabilities:
-                    width = capabilities.get('width', 0)
-                    height = capabilities.get('height', 0)
-                    fps = capabilities.get('fps', 0)
-                    resolutions = capabilities.get('supported_resolutions', [])
-                    combinations = capabilities.get('supported_combinations', [])
-                    
-                    info_text += f"""
-  Current Resolution: {width}x{height}
-  Current FPS: {fps}
-  Supported Resolutions: {', '.join(resolutions) if resolutions else 'Unknown'}"""
-                    
-                    if combinations:
-                        info_text += "\n  Supported Quality Options:"
-                        for combo in combinations:
-                            info_text += f"\n    • {combo['display_name']}"
-                    else:
-                        info_text += "\n  No quality options detected"
-                else:
-                    info_text += "\n  No capability information available"
-                    
-                self.camera_info_label.setText(info_text)
-            else:
-                self.camera_info_label.setText("Camera information not available")
-                
-        except Exception as e:
-            print(f"Error in update_camera_info_display(): {e}")
-            import traceback
-            traceback.print_exc()
+        # Use async version to prevent blocking
+        self.update_camera_info_display_async()
             
     def update_camera_view(self, frame):
         """Update the camera view with a new frame."""
@@ -885,6 +950,11 @@ class RaceTimerApp(QMainWindow):
                 event.ignore()
                 return
                 
+        # Stop camera scan thread if running
+        if self.camera_scan_thread and self.camera_scan_thread.isRunning():
+            self.camera_scan_thread.quit()
+            self.camera_scan_thread.wait(1000)  # Wait up to 1 second
+            
         if self.camera_thread:
             self.camera_thread.stop()
             

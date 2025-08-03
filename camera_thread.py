@@ -271,11 +271,11 @@ class CameraThread(QThread):
                 
                 # Test different resolution and framerate combinations
                 try:
-                    # Common resolution and framerate combinations
+                    # Reduced test combinations for faster detection
                     test_combinations = [
-                        (1920, 1080, 60), (1920, 1080, 30),  # 1080p options
-                        (1280, 720, 60), (1280, 720, 30),    # 720p options
-                        (640, 480, 30), (640, 480, 60)       # 480p options
+                        (1920, 1080, 30),  # 1080p @ 30fps
+                        (1280, 720, 30),   # 720p @ 30fps
+                        (640, 480, 30)     # 480p @ 30fps
                     ]
                     
                     supported_combinations = []
@@ -292,10 +292,10 @@ class CameraThread(QThread):
                             actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                             actual_fps = int(cap.get(cv2.CAP_PROP_FPS))
                             
-                            # More strict validation - camera must actually support the requested values
-                            width_match = abs(actual_width - width) <= 10  # Allow small tolerance
-                            height_match = abs(actual_height - height) <= 10  # Allow small tolerance
-                            fps_match = abs(actual_fps - fps) <= 5  # Allow small tolerance for FPS
+                            # More lenient validation for faster detection
+                            width_match = abs(actual_width - width) <= 50  # Allow larger tolerance
+                            height_match = abs(actual_height - height) <= 50  # Allow larger tolerance
+                            fps_match = abs(actual_fps - fps) <= 10  # Allow larger tolerance for FPS
                             
                             # Only add if the camera actually supports this combination
                             if width_match and height_match and fps_match:
@@ -306,7 +306,6 @@ class CameraThread(QThread):
                                     'display_name': f"{actual_width}x{actual_height} @ {actual_fps}fps"
                                 }
                                 supported_combinations.append(combination)
-                            # Removed verbose logging to reduce console noise
                                 
                         except Exception as e:
                             print(f"Error testing {width}x{height} @ {fps}fps: {e}")
@@ -345,8 +344,8 @@ class CameraThread(QThread):
             # Get Windows camera names
             windows_camera_names = self.get_windows_camera_names()
             
-            # Try to find cameras by testing indices 0-4 (most systems have 1-2 cameras)
-            for i in range(5):
+            # Try to find cameras by testing indices 0-2 (most systems have 1-2 cameras)
+            for i in range(3):
                 try:
                     # Try DirectShow first (most common on Windows)
                     cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
@@ -392,7 +391,7 @@ class CameraThread(QThread):
                     
             # If no cameras found with DirectShow, try MSMF
             if not cameras:
-                for i in range(5):
+                for i in range(3):
                     try:
                         cap = cv2.VideoCapture(i, cv2.CAP_MSMF)
                         if cap.isOpened():
@@ -436,7 +435,7 @@ class CameraThread(QThread):
         # Fallback: if no cameras found with detailed detection, try simple detection
         if not cameras:
             print("No cameras found with detailed detection, trying simple fallback...")
-            for i in range(5):  # Try fewer cameras for fallback
+            for i in range(3):  # Try fewer cameras for fallback
                 try:
                     cap = cv2.VideoCapture(i)
                     if cap.isOpened():
