@@ -278,12 +278,13 @@ class VideoRecorder:
                 f.write(f"Recording Start: {self.start_time}\n")
                 f.write(f"Total Frames: {self.frame_count}\n")
                 f.write(f"Video Quality: {self.quality}\n")
-                f.write(f"Frame Rate: {self.camera_fps} fps\n")
+                f.write(f"Recording FPS: {self.camera_fps} fps\n")
                 
                 # Handle quality settings for metadata
                 if isinstance(self.quality, dict):
                     f.write(f"Resolution: {self.quality['width']}x{self.quality['height']}\n")
-                    f.write(f"Target FPS: {self.quality.get('fps', 'Unknown')}\n")
+                    f.write(f"Quality Setting FPS: {self.quality.get('fps', 'Unknown')}\n")
+                    f.write(f"Note: Video recorded at fixed 30 FPS for consistent playback speed\n")
                 else:
                     settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
                     f.write(f"Resolution: {settings['width']}x{settings['height']}\n")

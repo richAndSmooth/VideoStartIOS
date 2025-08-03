@@ -429,6 +429,14 @@ class RaceTimerApp(QMainWindow):
                 self.refresh_btn.setEnabled(False)
                 self.refresh_btn.setText("Scanning...")
             
+            # Don't allow camera refresh during recording
+            if self.is_recording or self.is_sequence_active:
+                self.camera_combo.addItem("Camera refresh not available during recording")
+                if hasattr(self, 'refresh_btn'):
+                    self.refresh_btn.setEnabled(True)
+                    self.refresh_btn.setText("Refresh")
+                return
+                
             cameras = self.camera_thread.get_available_cameras()
             
             if not cameras:
@@ -494,8 +502,9 @@ class RaceTimerApp(QMainWindow):
                     self.status_label.setText(f"Switching to {camera_name}...")
                     self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffc107;")
                 
-                # Clear the camera view during switch
-                self.camera_label.setText("Switching cameras...")
+                # Clear the camera view during switch (unless recording)
+                if not (self.is_recording or self.is_sequence_active):
+                    self.camera_label.setText("Switching cameras...")
                 
                 # Switch the camera
                 self.camera_thread.change_camera(camera_index)
@@ -629,6 +638,10 @@ class RaceTimerApp(QMainWindow):
             
     def update_camera_view(self, frame):
         """Update the camera view with a new frame."""
+        # Don't update camera view if recording or sequence is active
+        if self.is_recording or self.is_sequence_active:
+            return
+            
         if frame is not None:
             # Convert OpenCV frame to QPixmap
             height, width, channel = frame.shape
@@ -659,6 +672,9 @@ class RaceTimerApp(QMainWindow):
         if self.quality_combo.count() <= 1:  # Only if still showing "Loading..." or empty
             self.update_quality_options()
             
+        # Show recording in progress message
+        self.show_recording_message("Start sequence in progress...")
+            
         # Create start sequence widget
         self.start_sequence_widget = StartSequenceWidget(
             self.start_sequence_config, 
@@ -678,15 +694,18 @@ class RaceTimerApp(QMainWindow):
         """Handle start sequence completion and start recording."""
         self.is_sequence_active = False
         
-        # Initialize video recorder with camera's actual FPS
+        # Show recording in progress message
+        self.show_recording_message("Recording in progress...")
+        
+        # Initialize video recorder with fixed 30 FPS for consistent playback
         output_path = self.get_output_path()
         quality_data = self.quality_combo.currentData() # Get the selected quality data
         
-        # Get camera's actual FPS (no delay needed)
-        camera_fps = self.camera_thread.get_camera_fps()
-        print(f"Using camera FPS: {camera_fps}")
+        # Use fixed 30 FPS for consistent video playback speed
+        recording_fps = 30.0
+        print(f"Using fixed recording FPS: {recording_fps}")
         
-        self.video_recorder = VideoRecorder(output_path, quality_data, camera_fps)
+        self.video_recorder = VideoRecorder(output_path, quality_data, recording_fps)
         self.video_recorder.start_recording()
         
         # Mark start time
@@ -713,6 +732,7 @@ class RaceTimerApp(QMainWindow):
     def on_sequence_cancelled(self):
         """Handle start sequence cancellation."""
         self.is_sequence_active = False
+        self.restore_camera_view()
         self.start_btn.setEnabled(True)
         self.status_label.setText("Ready")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #28a745;")
@@ -750,6 +770,9 @@ class RaceTimerApp(QMainWindow):
         self.status_label.setText("Recording saved")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #28a745;")
         
+        # Restore camera view
+        self.restore_camera_view()
+        
         # Add to recent recordings
         self.add_recent_recording()
         
@@ -758,6 +781,11 @@ class RaceTimerApp(QMainWindow):
         if hasattr(self, 'recording_start_time'):
             elapsed = datetime.now() - self.recording_start_time
             self.recording_time_label.setText(f"Recording time: {str(elapsed).split('.')[0]}")
+            
+            # Also update the recording message if currently recording
+            if self.is_recording:
+                elapsed_str = str(elapsed).split('.')[0]
+                self.show_recording_message(f"Recording in progress...\n\n{elapsed_str}")
             
     def record_current_frame(self):
         """Record the current camera frame."""
@@ -771,6 +799,41 @@ class RaceTimerApp(QMainWindow):
         if hasattr(self, 'frame_recording_active') and self.frame_recording_active:
             self.record_current_frame()
             
+    def show_recording_message(self, message: str):
+        """Show a recording message instead of the camera feed."""
+        # Create a styled message display
+        self.camera_label.clear()
+        self.camera_label.setText(message)
+        self.camera_label.setStyleSheet("""
+            QLabel {
+                background-color: #1a1a1a;
+                border: 3px solid #dc3545;
+                border-radius: 10px;
+                color: #dc3545;
+                font-size: 24px;
+                font-weight: bold;
+                padding: 40px;
+                text-align: center;
+            }
+        """)
+        self.camera_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+    def restore_camera_view(self):
+        """Restore the camera view display."""
+        self.camera_label.setStyleSheet("""
+            QLabel {
+                background-color: #1a1a1a;
+                border: 2px solid #555555;
+                border-radius: 5px;
+                color: #888888;
+                font-size: 16px;
+            }
+        """)
+        self.camera_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # The camera view will be restored automatically when the next frame arrives
+            
+
+    
     def get_output_path(self):
         """Get the output path for the video file."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

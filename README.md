@@ -99,8 +99,9 @@ Use online text-to-speech services to generate professional-quality audio files.
    - Configure auto-save settings
 
 4. **Start Recording**
-   - Click "Start Recording" to begin the countdown sequence
-   - The countdown will display: "3... 2... 1... GO!"
+   - Click "Start Sequence" to begin the countdown
+   - During the start sequence and recording, the camera feed is hidden and replaced with a "Recording in Progress" message
+   - The recording time is displayed in real-time
    - At "GO!", recording automatically starts and marks the start frame
    - The start time is precisely captured and displayed
 
@@ -110,6 +111,12 @@ Use online text-to-speech services to generate professional-quality audio files.
    - Video is automatically saved with timing markers
 
 ### Advanced Features
+
+#### Recording Display
+- **Hidden Camera Feed**: During start sequence and recording, the camera feed is hidden to prevent distraction
+- **Recording Message**: Displays "Recording in Progress" with real-time elapsed time
+- **Visual Feedback**: Red border and prominent text indicate active recording
+- **Automatic Restoration**: Camera feed automatically returns when recording stops
 
 #### Timing Markers
 - **Start Marker**: Automatically added to the first frame with timestamp
