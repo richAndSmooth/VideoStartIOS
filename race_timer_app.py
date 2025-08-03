@@ -776,11 +776,14 @@ class RaceTimerApp(QMainWindow):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"race_recording_{timestamp}.mp4"
         
-        # Create recordings directory if it doesn't exist
-        recordings_dir = os.path.join(os.getcwd(), "recordings")
-        os.makedirs(recordings_dir, exist_ok=True)
+        # Get the user's Pictures folder
+        pictures_dir = os.path.expanduser("~/Pictures")
         
-        return os.path.join(recordings_dir, filename)
+        # Create a RaceTimer subfolder in Pictures
+        race_timer_dir = os.path.join(pictures_dir, "RaceTimer")
+        os.makedirs(race_timer_dir, exist_ok=True)
+        
+        return os.path.join(race_timer_dir, filename)
         
     def add_recent_recording(self):
         """Add the current recording to the recent recordings list."""

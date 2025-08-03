@@ -10,7 +10,7 @@
     "countdown_duration": 3,
     "audio_enabled": true,
     "auto_save": true,
-    "output_directory": "recordings"
+    "output_directory": "~/Pictures/RaceTimer"
   },
   "timing": {
     "precision": "milliseconds",

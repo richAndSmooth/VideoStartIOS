@@ -30,7 +30,7 @@ class ConfigManager:
                 "countdown_duration": 3,
                 "audio_enabled": True,
                 "auto_save": True,
-                "output_directory": "recordings"
+                "output_directory": "~/Pictures/RaceTimer"
             },
             "timing": {
                 "precision": "milliseconds",

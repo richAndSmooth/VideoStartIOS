@@ -123,7 +123,7 @@ Use online text-to-speech services to generate professional-quality audio files.
   - High: 1920x1080 @ 30fps
   - Medium: 1280x720 @ 30fps
   - Low: 854x480 @ 30fps
-- **File Location**: `recordings/` directory with timestamped filenames
+- **File Location**: `~/Pictures/RaceTimer/` directory with timestamped filenames
 
 #### Recent Recordings
 - View list of recent recordings with timing information
@@ -151,9 +151,10 @@ VideoStart/
 │   ├── in_position.wav
 │   ├── set.wav
 │   └── start_beep.wav
-├── recordings/                # Video output directory
 └── config.json                # Application configuration
 ```
+
+**Note**: Video recordings are automatically saved to `~/Pictures/RaceTimer/` directory.
 
 ## Configuration
 
@@ -168,7 +169,7 @@ The application automatically creates a `config.json` file with default settings
 - Default video quality
 - Countdown duration
 - Audio preferences
-- Output directory
+- Output directory (defaults to ~/Pictures/RaceTimer/)
 
 ### Webhook Settings (Future)
 - Server port and endpoint
