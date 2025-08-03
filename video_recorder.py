@@ -13,7 +13,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 class VideoRecorder:
     """Handles video recording with timing markers."""
     
-    def __init__(self, output_path: str, quality: str = "Medium (720p)", camera_fps: float = 30.0):
+    def __init__(self, output_path: str, quality: Any = "Medium (720p)", camera_fps: float = 30.0):
         self.output_path = output_path
         self.quality = quality
         self.camera_fps = camera_fps
@@ -32,8 +32,13 @@ class VideoRecorder:
     def start_recording(self):
         """Start video recording."""
         try:
-            # Get quality settings
-            settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
+            # Get quality settings - handle both string keys and dictionary objects
+            if isinstance(self.quality, dict):
+                # Quality is already a dictionary with width/height/fps
+                settings = self.quality
+            else:
+                # Quality is a string key, look it up in quality_settings
+                settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
             
             # Create output directory if it doesn't exist
             output_dir = os.path.dirname(self.output_path)
@@ -67,8 +72,14 @@ class VideoRecorder:
             return
             
         try:
-            # Resize frame to match quality settings
-            settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
+            # Resize frame to match quality settings - handle both string keys and dictionary objects
+            if isinstance(self.quality, dict):
+                # Quality is already a dictionary with width/height/fps
+                settings = self.quality
+            else:
+                # Quality is a string key, look it up in quality_settings
+                settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
+            
             resized_frame = cv2.resize(frame, (settings["width"], settings["height"]))
             
             # Convert RGB to BGR for OpenCV
@@ -268,7 +279,14 @@ class VideoRecorder:
                 f.write(f"Total Frames: {self.frame_count}\n")
                 f.write(f"Video Quality: {self.quality}\n")
                 f.write(f"Frame Rate: {self.camera_fps} fps\n")
-                f.write(f"Resolution: {self.quality_settings[self.quality]['width']}x{self.quality_settings[self.quality]['height']}\n")
+                
+                # Handle quality settings for metadata
+                if isinstance(self.quality, dict):
+                    f.write(f"Resolution: {self.quality['width']}x{self.quality['height']}\n")
+                    f.write(f"Target FPS: {self.quality.get('fps', 'Unknown')}\n")
+                else:
+                    settings = self.quality_settings.get(self.quality, self.quality_settings["Medium (720p)"])
+                    f.write(f"Resolution: {settings['width']}x{settings['height']}\n")
                 
             print(f"Metadata saved to: {metadata_path}")
             

@@ -1,0 +1,10 @@
+Race Timer Recording Metadata
+==============================
+
+Video File: race_recording_20250803_120829.mp4
+Recording Start: 2025-08-03 12:08:30.014286
+Total Frames: 923
+Video Quality: {'display_name': '1920x1080 @ 60fps', 'fps': 60, 'height': 1080, 'width': 1920}
+Frame Rate: 30.00003000003 fps
+Resolution: 1920x1080
+Target FPS: 60

@@ -178,12 +178,16 @@ class StartSequenceWidget(QWidget):
         else:
             print(f"Audio not available for: {step_key} (enabled: {self.audio_enabled}, has_effect: {step_key in self.audio_effects})")
         
-        # Schedule next step
+        # Special handling for start_beep step - emit signal immediately
+        if step_key == "start_beep":
+            print("Start beep played - emitting sequence_finished immediately")
+            self.sequence_finished.emit()
+            self.close()
+            return
+        
+        # Schedule next step for other steps
         if duration > 0:
             self.timer.singleShot(int(duration * 1000), self.next_step)
-        else:
-            # For the final "GO!" step, wait a bit then finish
-            self.timer.singleShot(100, self.next_step)
         
         self.current_step += 1
         
