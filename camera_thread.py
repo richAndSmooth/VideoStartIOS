@@ -5,6 +5,7 @@ Handles webcam capture in a separate thread to prevent UI blocking.
 
 import cv2
 import numpy as np
+import time
 from PyQt6.QtCore import QThread, pyqtSignal
 from typing import List, Optional, Dict, Tuple
 import subprocess
@@ -59,12 +60,10 @@ class CameraThread(QThread):
                             self.frame_ready_signal.emit()
                         else:
                             # Frame read failed, try to reconnect
-                            print("Frame read failed, attempting reconnection...")
                             self.camera = None  # Force reconnection
                             connection_attempts = 0  # Reset attempts
                             self.msleep(500)  # Wait 500ms before retry
                     except Exception as e:
-                        print(f"Frame read error: {e}")
                         # Try to reconnect on frame read errors
                         self.camera = None  # Force reconnection
                         connection_attempts = 0  # Reset attempts
@@ -72,7 +71,6 @@ class CameraThread(QThread):
                 else:
                     # Camera not connected, try to connect with limited attempts
                     if connection_attempts < max_connection_attempts:
-                        print(f"Attempting camera connection (attempt {connection_attempts + 1}/{max_connection_attempts})...")
                         if self.connect_camera(self.current_camera_index):
                             connection_attempts = 0  # Reset on success
                         else:
@@ -80,7 +78,6 @@ class CameraThread(QThread):
                         self.msleep(2000)  # Wait 2 seconds between attempts
                     else:
                         # Stop trying to connect after max attempts
-                        print(f"Failed to connect to camera after {max_connection_attempts} attempts. Waiting for manual connection...")
                         self.msleep(5000)  # Wait 5 seconds before checking again
                         connection_attempts = 0  # Reset for next cycle
             except Exception as e:

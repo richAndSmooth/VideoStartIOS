@@ -69,24 +69,22 @@ class ConfigManager:
                     
                 # Merge with default config (preserve defaults for new settings)
                 self.merge_config(self.config, loaded_config)
-                print(f"Configuration loaded from: {self.config_file}")
             else:
-                print("No configuration file found, using defaults")
+                # No configuration file found, using defaults
                 self.save_config()
                 
         except Exception as e:
-            print(f"Error loading configuration: {str(e)}")
-            print("Using default configuration")
+            pass  # Using default configuration
             
     def save_config(self):
         """Save configuration to file."""
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
-            print(f"Configuration saved to: {self.config_file}")
+            pass  # Configuration saved successfully
             
         except Exception as e:
-            print(f"Error saving configuration: {str(e)}")
+            pass  # Error saving configuration
             
     def merge_config(self, default: Dict[str, Any], loaded: Dict[str, Any]):
         """Recursively merge loaded configuration with defaults."""
@@ -184,17 +182,16 @@ class ConfigManager:
         """Reset configuration to default values."""
         self.config = self.load_default_config()
         self.save_config()
-        print("Configuration reset to defaults")
         
     def export_config(self, filepath: str):
         """Export configuration to a file."""
         try:
             with open(filepath, 'w') as f:
                 json.dump(self.config, f, indent=2)
-            print(f"Configuration exported to: {filepath}")
+            pass  # Configuration exported successfully
             
         except Exception as e:
-            print(f"Error exporting configuration: {str(e)}")
+            pass  # Error exporting configuration
             
     def import_config(self, filepath: str):
         """Import configuration from a file."""
@@ -204,10 +201,10 @@ class ConfigManager:
                 
             self.merge_config(self.config, imported_config)
             self.save_config()
-            print(f"Configuration imported from: {filepath}")
+            pass  # Configuration imported successfully
             
         except Exception as e:
-            print(f"Error importing configuration: {str(e)}")
+            pass  # Error importing configuration
             
     def get_config_summary(self) -> Dict[str, Any]:
         """Get a summary of current configuration."""

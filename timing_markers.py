@@ -21,7 +21,6 @@ class TimingMarkers:
     def set_start_time(self, start_time: datetime):
         """Set the start time marker."""
         self.start_time = start_time
-        print(f"Start time marked: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
         
     def set_finish_time(self, finish_time: datetime, lane: int = 1, participant_id: Optional[str] = None):
         """Set the finish time marker."""
@@ -35,8 +34,6 @@ class TimingMarkers:
             "duration": self.get_duration() if self.start_time else None
         }
         self.finish_times.append(finish_data)
-        
-        print(f"Finish time marked: {finish_time.strftime('%H:%M:%S.%f')[:-3]}")
         
     def get_duration(self) -> Optional[timedelta]:
         """Get the duration between start and finish."""
@@ -67,7 +64,6 @@ class TimingMarkers:
         self.start_time = None
         self.finish_time = None
         self.finish_times.clear()
-        print("Timing markers cleared")
         
     def set_event_id(self, event_id: str):
         """Set the event identifier."""
@@ -128,10 +124,10 @@ class TimingMarkers:
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=2)
                 
-            print(f"Timing data saved to: {filepath}")
+            pass  # Timing data saved successfully
             
         except Exception as e:
-            print(f"Error saving timing data: {str(e)}")
+            pass  # Handle save error silently
             
     def load_timing_data(self, filepath: str):
         """Load timing data from a JSON file."""
@@ -163,10 +159,10 @@ class TimingMarkers:
                     "duration": duration
                 })
                 
-            print(f"Timing data loaded from: {filepath}")
+            pass  # Timing data loaded successfully
             
         except Exception as e:
-            print(f"Error loading timing data: {str(e)}")
+            pass  # Handle load error silently
             
     def is_complete(self) -> bool:
         """Check if timing data is complete (has both start and finish)."""

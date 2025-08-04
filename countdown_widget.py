@@ -156,13 +156,12 @@ class CountdownWidget(QWidget):
     def play_countdown_audio(self, number: int):
         """Play countdown audio (placeholder)."""
         # This would integrate with a text-to-speech system
-        # For now, we'll just print to console
-        print(f"Countdown: {number}")
+        pass
         
     def play_go_audio(self):
         """Play 'GO!' audio (placeholder)."""
         # This would play a 'GO!' sound
-        print("GO!")
+        pass
         
     def finish_countdown(self):
         """Finish the countdown and emit signal."""

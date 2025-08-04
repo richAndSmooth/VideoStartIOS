@@ -4,7 +4,6 @@ Handles the race start sequence with audio cues.
 """
 
 import os
-import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 )
@@ -48,9 +47,7 @@ class StartSequenceWidget(QWidget):
         
         self.init_ui()
         
-        # Test audio loading
-        print(f"Audio effects loaded: {list(self.audio_effects.keys())}")
-        print(f"Audio enabled: {self.audio_enabled}")
+        # Audio loading completed
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -150,9 +147,8 @@ class StartSequenceWidget(QWidget):
                 effect.setSource(QUrl.fromLocalFile(file_path))
                 effect.setVolume(1.0)  # Maximum volume
                 self.audio_effects[key] = effect
-                print(f"Loaded audio: {key} -> {file_path} (volume: 1.0)")
             else:
-                print(f"Warning: Audio file not found: {file_path}")
+                pass  # Audio file not found
         
     def start_sequence(self):
         """Start the race start sequence."""
@@ -174,17 +170,15 @@ class StartSequenceWidget(QWidget):
         
         # Special handling for start_beep step - TRULY SIMULTANEOUS audio and signal
         if step_key == "start_beep":
-            print("🎵 SIMULTANEOUS BEEP AND RECORDING START!")
+            # Simultaneous beep and recording start
             
             # For maximum synchronization: start audio and emit signal in rapid succession
             if self.audio_enabled and step_key in self.audio_effects:
                 # Start audio first (it has its own buffering delay)
                 self.audio_effects[step_key].play()
-                print(f"Beep audio started")
             
             # Emit signal immediately after audio starts (they're now truly synchronized)
-            self.start_beep_played.emit()  
-            print(f"Recording signal emitted - SYNCHRONIZED with beep audio")
+            self.start_beep_played.emit()
             
             # Emit sequence_finished for UI updates (happens slightly after)
             self.sequence_finished.emit()
@@ -193,10 +187,9 @@ class StartSequenceWidget(QWidget):
         
         # Play audio for other steps (normal flow)
         if self.audio_enabled and step_key in self.audio_effects:
-            print(f"Playing audio: {step_key}")
             self.audio_effects[step_key].play()
         else:
-            print(f"Audio not available for: {step_key} (enabled: {self.audio_enabled}, has_effect: {step_key in self.audio_effects})")
+            pass  # Audio not available for this step
         
         # Schedule next step for other steps
         if duration > 0:

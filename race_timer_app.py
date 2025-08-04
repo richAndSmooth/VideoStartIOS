@@ -129,7 +129,6 @@ class RaceTimerApp(QMainWindow):
                 QTimer.singleShot(500, self.auto_select_first_camera)
                 
         except Exception as e:
-            print(f"Error handling cameras ready: {e}")
             self.camera_combo.addItem("Error loading cameras")
             self.status_label.setText("Camera load failed")
             self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
@@ -149,14 +148,12 @@ class RaceTimerApp(QMainWindow):
                 # Don't auto-select if it's a placeholder item
                 first_item = self.camera_combo.itemText(0)
                 if first_item not in ["No cameras found", "Camera scan failed", "Scanning cameras..."]:
-                    print("Auto-selecting first camera...")
                     self.change_camera()
         except Exception as e:
-            print(f"Error in auto_select_first_camera: {e}")
+            pass  # Handle auto-select error silently
                 
     def on_camera_scan_error(self, error_message):
         """Handle camera scan errors."""
-        print(f"Camera scan error: {error_message}")
         self.camera_combo.clear()
         self.camera_combo.addItem("Camera scan failed")
         self.status_label.setText("Camera scan failed")
@@ -217,7 +214,6 @@ class RaceTimerApp(QMainWindow):
                 self.camera_info_label.setText("Camera information not available")
                 
         except Exception as e:
-            print(f"Error in update_camera_info_display_async(): {e}")
             self.camera_info_label.setText("Error loading camera information")
         
     def init_ui(self):
@@ -564,7 +560,6 @@ class RaceTimerApp(QMainWindow):
             # This prevents startup crashes from camera initialization issues
             
         except Exception as e:
-            print(f"Error setting up camera: {e}")
             self.camera_thread = None
             
     def connect_camera_signals(self):
@@ -586,7 +581,6 @@ class RaceTimerApp(QMainWindow):
             self.start_camera_scan()
                 
         except Exception as e:
-            print(f"Error refreshing cameras: {e}")
             self.camera_combo.addItem("Error scanning cameras")
             self.status_label.setText("Camera scan failed")
             self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #dc3545;")
@@ -625,7 +619,6 @@ class RaceTimerApp(QMainWindow):
                 
                 # Start camera thread if not already running
                 if not self.camera_thread.isRunning():
-                    print("Starting camera thread...")
                     self.camera_thread.start()
                 
                 # Get camera details for better feedback
@@ -649,9 +642,7 @@ class RaceTimerApp(QMainWindow):
                 QTimer.singleShot(2000, self.update_camera_status)
                 
         except Exception as e:
-            print(f"Error in change_camera(): {e}")
-            import traceback
-            traceback.print_exc()
+            pass  # Handle camera change error silently
             
     def update_camera_status(self):
         """Update camera status after switching."""
@@ -761,7 +752,6 @@ class RaceTimerApp(QMainWindow):
             
         # PRE-MEASURE camera FPS and initialize video recorder BEFORE sequence starts
         # This ensures recording starts immediately when the beep plays
-        print("Pre-measuring camera FPS for synchronized recording...")
         self.status_label.setText("Measuring camera FPS...")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffc107;")
         
@@ -770,20 +760,17 @@ class RaceTimerApp(QMainWindow):
         
         # Measure FPS now (before sequence starts)
         actual_camera_fps = self.camera_thread.measure_real_time_fps(2.0)
-        print(f"Pre-measured camera FPS: {actual_camera_fps:.2f}")
+        pass  # Camera FPS measured
         
         # Validate FPS is reasonable
         if actual_camera_fps < 10 or actual_camera_fps > 60:
-            print(f"Warning: Unusual FPS detected ({actual_camera_fps:.2f}), using fallback")
             actual_camera_fps = 15.0  # Safe fallback
         
         # Initialize video recorder now (but don't start recording yet)
         self.video_recorder = VideoRecorder(output_path, quality_data, actual_camera_fps)
         
         # Pre-initialize the video writer (slow operation done BEFORE beep)
-        print("Pre-initializing video writer for instant recording start...")
         self.video_recorder.initialize_writer()
-        print("✅ Video writer fully ready - recording will start instantly with beep")
             
         # Show recording in progress message
         self.show_recording_message("Start sequence in progress...")
@@ -814,7 +801,6 @@ class RaceTimerApp(QMainWindow):
         # Recording should already be started by on_start_beep_played()
         # Just update UI and start timers
         if not self.is_recording:
-            print("WARNING: Recording not started by beep signal - starting now as fallback")
             if self.video_recorder:
                 self.video_recorder.start_recording()
                 self.is_recording = True
@@ -824,7 +810,7 @@ class RaceTimerApp(QMainWindow):
                 self.start_time_label.setText(f"Start: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
                 self.frame_recording_active = True
         
-        print("Sequence finished - updating UI for recording")
+        # Sequence finished - updating UI for recording
         
         # Update UI
         self.stop_btn.setEnabled(True)
@@ -841,7 +827,7 @@ class RaceTimerApp(QMainWindow):
         """Handle the exact moment when the start beep is played - INSTANTANEOUS START."""
         # Mark the EXACT start time FIRST (before any processing delays)
         beep_start_time = datetime.now()
-        print(f"🎵 BEEP SIGNAL RECEIVED! Recording starting NOW at {beep_start_time.strftime('%H:%M:%S.%f')[:-3]}")
+        # Beep signal received - recording starting now
         
         # Start recording IMMEDIATELY - no delays, no extra logging
         if self.video_recorder and not self.is_recording:
@@ -853,9 +839,9 @@ class RaceTimerApp(QMainWindow):
             self.timing_markers.set_start_time(beep_start_time)
             self.start_time_label.setText(f"Start: {beep_start_time.strftime('%H:%M:%S.%f')[:-3]}")
             
-            print(f"✅ Recording started instantaneously with beep at: {beep_start_time}")
+            pass  # Recording started successfully
         else:
-            print(f"❌ ERROR: Video recorder not ready or already recording")
+            pass  # Error: Video recorder not ready
             
     def on_sequence_cancelled(self):
         """Handle start sequence cancellation."""
@@ -863,7 +849,6 @@ class RaceTimerApp(QMainWindow):
         
         # Clean up pre-initialized video recorder if sequence was cancelled
         if hasattr(self, 'video_recorder') and self.video_recorder:
-            print("Cleaning up pre-initialized video recorder (sequence cancelled)")
             self.video_recorder = None
         
         self.restore_camera_view()
@@ -938,7 +923,6 @@ class RaceTimerApp(QMainWindow):
                 if self.frame_count % 30 == 0:
                     elapsed = (current_time - self.last_frame_time).total_seconds()
                     actual_fps = 30 / elapsed if elapsed > 0 else 0
-                    print(f"Frame recording timing: {actual_fps:.2f} fps (expected: ~30fps)")
                     self.last_frame_time = current_time
                 
                 self.video_recorder.record_frame(frame)
@@ -1059,7 +1043,7 @@ def get_camera_capabilities(self, camera_index: int, backend) -> Dict[str, any]:
                 capabilities['fps'] = int(cap.get(cv2.CAP_PROP_FPS))
                 capabilities['backend'] = backend
             except Exception as e:
-                print(f"Error getting basic camera properties: {e}")
+                pass  # Error getting basic camera properties
                 capabilities['width'] = 0
                 capabilities['height'] = 0
                 capabilities['fps'] = 0
@@ -1102,7 +1086,6 @@ def get_camera_capabilities(self, camera_index: int, backend) -> Dict[str, any]:
                             supported_combinations.append(combination)
                             
                     except Exception as e:
-                        print(f"Error testing {width}x{height} @ {fps}fps: {e}")
                         continue
                 
                 capabilities['supported_combinations'] = supported_combinations
@@ -1112,17 +1095,16 @@ def get_camera_capabilities(self, camera_index: int, backend) -> Dict[str, any]:
                 capabilities['supported_resolutions'] = resolutions
                 
             except Exception as e:
-                print(f"Error testing resolution/framerate combinations: {e}")
                 capabilities['supported_combinations'] = []
                 capabilities['supported_resolutions'] = []
                 
     except Exception as e:
-        print(f"Error getting camera capabilities: {e}")
+        pass  # Error getting camera capabilities
     finally:
         if cap is not None:
             try:
                 cap.release()
             except Exception as e:
-                print(f"Error releasing camera: {e}")
+                pass  # Error releasing camera
         
     return capabilities 

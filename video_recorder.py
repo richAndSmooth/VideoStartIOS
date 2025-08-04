@@ -51,7 +51,6 @@ class VideoRecorder:
             
             for codec in codecs_to_try:
                 try:
-                    print(f"Initializing video writer with codec: {codec}")
                     fourcc = cv2.VideoWriter_fourcc(*codec)
                     self.writer = cv2.VideoWriter(
                         self.output_path,
@@ -61,13 +60,11 @@ class VideoRecorder:
                     )
                     
                     if self.writer.isOpened():
-                        print(f"Video writer initialized successfully with codec: {codec}")
                         break
                     else:
                         self.writer.release()
                         self.writer = None
                 except Exception as e:
-                    print(f"Failed to initialize with codec {codec}: {e}")
                     if self.writer:
                         self.writer.release()
                         self.writer = None
@@ -77,10 +74,8 @@ class VideoRecorder:
             
             # Validate the writer was created with correct FPS
             actual_fps = self.writer.get(cv2.CAP_PROP_FPS)
-            print(f"Video writer FPS validation: {actual_fps} (requested: {self.camera_fps})")
             
             if abs(actual_fps - self.camera_fps) > 1.0:
-                print(f"Warning: FPS mismatch! Requested: {self.camera_fps}, Got: {actual_fps}")
                 # Try to reinitialize with a different codec if there's a mismatch
                 self.writer.release()
                 fourcc = cv2.VideoWriter_fourcc(*'H264')
@@ -102,11 +97,9 @@ class VideoRecorder:
                     if not self.writer.isOpened():
                         raise Exception("Failed to initialize video writer with any codec")
             
-            print(f"Video writer fully initialized and ready for: {self.output_path}")
             return True
             
         except Exception as e:
-            print(f"Error initializing video writer: {str(e)}")
             raise
     
     def start_recording(self):
@@ -121,10 +114,9 @@ class VideoRecorder:
             self.start_time = datetime.now()
             self.race_start_time = datetime.now()  # Set race start time when recording begins
             
-            print(f"🎬 RECORDING STARTED INSTANTLY at {self.start_time.strftime('%H:%M:%S.%f')[:-3]}")
+            pass  # Recording started
             
         except Exception as e:
-            print(f"Error starting recording: {str(e)}")
             raise
             
     def record_frame(self, frame: np.ndarray):
@@ -158,7 +150,7 @@ class VideoRecorder:
             self.frame_count += 1
             
         except Exception as e:
-            print(f"Error recording frame: {str(e)}")
+            pass  # Handle frame recording error silently
             
     def add_start_marker(self, frame: np.ndarray) -> np.ndarray:
         """Add start marker overlay to frame."""
@@ -211,7 +203,6 @@ class VideoRecorder:
             return marked_frame
             
         except Exception as e:
-            print(f"Error adding start marker: {str(e)}")
             return frame
             
     def add_time_overlay(self, frame: np.ndarray) -> np.ndarray:
@@ -257,7 +248,6 @@ class VideoRecorder:
             return marked_frame
             
         except Exception as e:
-            print(f"Error adding time overlay: {str(e)}")
             return frame
             
     def add_finish_marker(self, frame: np.ndarray, finish_time: datetime) -> np.ndarray:
@@ -311,7 +301,6 @@ class VideoRecorder:
             return marked_frame
             
         except Exception as e:
-            print(f"Error adding finish marker: {str(e)}")
             return frame
             
     def stop_recording(self):
@@ -321,14 +310,13 @@ class VideoRecorder:
                 self.writer.release()
                 self.is_recording = False
                 
-                print(f"Recording stopped. Total frames: {self.frame_count}")
-                print(f"Video saved to: {self.output_path}")
+                pass  # Recording stopped successfully
                 
                 # Create metadata file
                 self.create_metadata_file()
                 
             except Exception as e:
-                print(f"Error stopping recording: {str(e)}")
+                pass  # Handle stop recording error silently
                 
     def create_metadata_file(self):
         """Create a metadata file with timing information."""
@@ -372,10 +360,10 @@ class VideoRecorder:
                 f.write(f"\nVideo Codec: {actual_codec} (OpenCV)\n")
                 f.write(f"Note: Video recorded at camera's actual FPS for accurate playback speed\n")
                 
-            print(f"Metadata saved to: {metadata_path}")
+            pass  # Metadata saved successfully
             
         except Exception as e:
-            print(f"Error creating metadata file: {str(e)}")
+            pass  # Handle metadata creation error silently
             
     def get_recording_info(self) -> Dict[str, Any]:
         """Get information about the current recording."""

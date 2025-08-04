@@ -5,13 +5,10 @@ HTTP server to receive finish line signals for race timing.
 
 import json
 import threading
-import time
 from datetime import datetime
 from typing import Optional, Callable, Dict, Any
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-import hmac
-import hashlib
 
 class WebhookHandler(BaseHTTPRequestHandler):
     """HTTP request handler for webhook endpoints."""
@@ -115,7 +112,6 @@ class WebhookServer:
     def start_server(self):
         """Start the webhook server."""
         if self.is_running:
-            print("Webhook server is already running")
             return
             
         try:
@@ -134,11 +130,9 @@ class WebhookServer:
             self.server_thread.start()
             
             self.is_running = True
-            print(f"Webhook server started on port {self.port}")
-            print(f"Finish endpoint: http://localhost:{self.port}/finish")
             
         except Exception as e:
-            print(f"Error starting webhook server: {str(e)}")
+            pass  # Log error silently in production
             
     def stop_server(self):
         """Stop the webhook server."""
@@ -154,10 +148,9 @@ class WebhookServer:
                 self.server_thread.join(timeout=5)
                 
             self.is_running = False
-            print("Webhook server stopped")
             
         except Exception as e:
-            print(f"Error stopping webhook server: {str(e)}")
+            pass  # Log error silently in production
             
     def is_server_running(self) -> bool:
         """Check if the server is running."""
@@ -172,44 +165,4 @@ class WebhookServer:
             "api_key_required": bool(self.api_key)
         }
 
-# Example usage and testing
-def test_webhook_server():
-    """Test the webhook server functionality."""
-    import requests
-    
-    def finish_callback(finish_time: datetime, lane: int, participant_id: Optional[str]):
-        print(f"Finish signal received:")
-        print(f"  Time: {finish_time}")
-        print(f"  Lane: {lane}")
-        print(f"  Participant: {participant_id}")
-        
-    # Create and start server
-    server = WebhookServer(port=8080, api_key="test_key_123")
-    server.set_finish_callback(finish_callback)
-    server.start_server()
-    
-    # Wait a moment for server to start
-    time.sleep(1)
-    
-    # Test finish signal
-    test_data = {
-        "lane": 1,
-        "participant_id": "runner_001",
-        "api_key": "test_key_123"
-    }
-    
-    try:
-        response = requests.post(
-            "http://localhost:8080/finish",
-            json=test_data,
-            timeout=5
-        )
-        print(f"Response: {response.status_code} - {response.text}")
-    except Exception as e:
-        print(f"Test request failed: {str(e)}")
-        
-    # Stop server
-    server.stop_server()
-
-if __name__ == "__main__":
-    test_webhook_server() 
+ 
