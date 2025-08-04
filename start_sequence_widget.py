@@ -4,6 +4,7 @@ Handles the race start sequence with audio cues.
 """
 
 import os
+import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 )
@@ -128,6 +129,15 @@ class StartSequenceWidget(QWidget):
         
         layout.addLayout(button_layout)
         
+    def get_resource_path(self, relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller."""
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+    
     def setup_audio(self):
         """Setup audio effects for the sequence."""
         if not self.audio_enabled:
@@ -141,7 +151,8 @@ class StartSequenceWidget(QWidget):
             'start_beep': 'audio/start_beep.wav'
         }
         
-        for key, file_path in audio_files.items():
+        for key, relative_path in audio_files.items():
+            file_path = self.get_resource_path(relative_path)
             if os.path.exists(file_path):
                 effect = QSoundEffect()
                 effect.setSource(QUrl.fromLocalFile(file_path))

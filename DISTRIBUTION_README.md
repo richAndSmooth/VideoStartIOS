@@ -72,6 +72,11 @@ RaceTimer.exe
 3. **Missing DLLs:** Install Visual C++ Redistributable for Visual Studio 2015-2022.
 4. **Permissions:** Run as Administrator if needed.
 
+### Audio Issues (FIXED!)
+1. **Audio not playing**: This has been fixed in the latest build with proper PyInstaller path resolution
+2. **Audio quality**: The executable includes high-quality prerecorded WAV files  
+3. **Audio timing**: Start sequence audio is perfectly synchronized with visual cues
+
 ### Camera Issues
 1. Ensure camera is connected and not used by other applications
 2. Check Windows camera privacy settings
