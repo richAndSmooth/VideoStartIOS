@@ -1,245 +1,234 @@
-# Race Timer - Complete Timing System
+# VideoStart React Native
 
-A Windows 11 desktop application for complete race timing with start signal and finish line integration. This application provides real-time webcam recording with automatic start signal marking and configurable countdown sequences.
+A complete rewrite of the original VideoStart desktop application as a React Native app, specifically optimized for iPhone 11 Pro Max with 1080p @ 240fps video recording capabilities.
 
-## Features
+## 🏎️ Features
 
-### Current Phase (Phase 1)
-- **Desktop Application**: Native Windows 11 desktop app built with PyQt6
-- **Camera Integration**: Real-time webcam preview and recording
-- **Prerecorded Audio**: High-quality prerecorded audio for start sequence
-- **Countdown Sequence**: Configurable 3-2-1-GO countdown with visual and audio cues
-- **Automatic Start Marking**: Precise frame marking at start signal
-- **Video Recording**: MP4 output with embedded timing markers
-- **Offline Functionality**: Fully offline operation (except future webhook feature)
+### Current Functionality (Ported from Original)
+- ✅ **High-Speed Camera Recording** - 1080p @ 240fps on iPhone 11 Pro Max
+- ✅ **Countdown Sequence** - Configurable start sequence with audio cues
+- ✅ **Frame-by-Frame Timing** - Precise timing markers for each recorded frame
+- ✅ **Audio System** - Prerecorded audio for "Go to start", "In position", "Set", and start beep
+- ✅ **Real-time Performance Monitoring** - Live FPS measurement and frame counting
+- ✅ **Optimized UI** - iPhone 11 Pro Max specific layout optimization
+- ✅ **Configuration Management** - Persistent settings with AsyncStorage
 
-### Future Phase (Phase 2)
-- **Webhook Integration**: HTTP server to receive finish line signals
-- **Multiple Finish Signals**: Support for different lanes/participants
-- **Configurable Endpoints**: Customizable webhook endpoints and authentication
+### New Mobile Features
+- 📱 **Native iOS Performance** - Direct access to iPhone camera APIs
+- 🎯 **Touch-Optimized Interface** - Redesigned for mobile interaction
+- 🔋 **Power Management** - Keep screen awake during recording
+- 📐 **Orientation Lock** - Portrait mode optimized for race timing
+- 💾 **Local Storage** - Videos saved to device photo library
 
-## Installation
+## 🎥 Video Recording Capabilities
 
-### Prerequisites
-- Windows 11 (or Windows 10)
-- Python 3.8 or higher
-- Webcam/camera device
+| Feature | Specification |
+|---------|---------------|
+| **Resolution** | 1920x1080 (Full HD) |
+| **Frame Rate** | 240 fps (high-speed) |
+| **Format** | MP4 with H.264 encoding |
+| **Audio** | Synchronized audio recording |
+| **Timing Precision** | Frame-accurate timing markers |
+| **Performance Monitoring** | Real-time FPS measurement |
 
-### Setup Instructions
+## 📱 Device Requirements
 
-1. **Clone or download the project**
+### Required Hardware
+- **iPhone 11 Pro Max** (specifically required for 240fps support)
+- **iOS 15.0+** 
+- **Minimum 64GB storage** (high frame rate video files are large)
+
+### Development Requirements
+- **macOS** for iOS development
+- **Xcode 14+**
+- **React Native 0.72+**
+- **Physical device** (simulator cannot access camera)
+
+## 🚀 Quick Start
+
+1. **Clone and Setup**
    ```bash
    git clone <repository-url>
-   cd VideoStart
+   cd VideoStartRN
+   npm install
+   cd ios && pod install && cd ..
    ```
 
-2. **Install Python dependencies**
+2. **Run on iPhone 11 Pro Max**
    ```bash
-   pip install -r requirements.txt
+   npx react-native run-ios --device
    ```
 
-3. **Create audio files (optional but recommended)**
-   ```bash
-   python create_audio_files.py
-   ```
-   This creates basic audio files. For better quality, record your own voice or use online TTS services.
+3. **Start Recording**
+   - Grant camera permissions
+   - Tap "Start Sequence"
+   - Follow countdown prompts
+   - Recording begins automatically at "GO!"
 
-4. **Run the application**
-   ```bash
-   python main.py
-   ```
+## 🏗️ Architecture
 
-#### Quick Start (Windows)
-- Double-click `run_race_timer.bat` to automatically install dependencies and start the application
+### Key Components
 
-## Audio Setup
+```
+src/
+├── components/
+│   ├── RaceTimerApp.tsx         # Main application component
+│   ├── CameraView.tsx           # 240fps camera with frame processing
+│   ├── ControlPanel.tsx         # Start/stop controls
+│   ├── StatusPanel.tsx          # Timing information display
+│   ├── StartSequenceOverlay.tsx # Countdown sequence UI
+│   └── RecordingOverlay.tsx     # Recording status overlay
+├── context/
+│   ├── CameraContext.tsx        # Camera state management
+│   └── ConfigContext.tsx        # Settings and configuration
+└── services/
+    ├── TimingMarkers.ts         # High-precision timing system
+    └── AudioManager.ts          # Audio playback system
+```
 
-The application uses prerecorded audio files for the start sequence. These files should be placed in the `audio/` directory:
+### Technical Implementation
 
-### Required Audio Files
-- `go_to_start.wav` - "Go to the start" announcement
-- `in_position.wav` - "In position" announcement  
-- `set.wav` - "Set" announcement
-- `start_beep.wav` - Start signal beep
+- **Camera**: `react-native-vision-camera` with frame processor
+- **Audio**: `react-native-sound` for sequence audio
+- **Storage**: `@react-native-async-storage/async-storage` for settings
+- **Timing**: `performance.now()` for microsecond precision
+- **UI**: Optimized for iPhone 11 Pro Max dimensions (414×896)
 
-### Creating Audio Files
+## ⚙️ Configuration
 
-#### Option 1: Automatic Generation
+### Start Sequence Settings
+```typescript
+{
+  goToStartDuration: 5,      // seconds
+  inPositionMin: 1.0,        // seconds  
+  inPositionMax: 3.0,        // seconds
+  setMin: 1.0,               // seconds
+  setMax: 3.0,               // seconds
+  audioEnabled: true         // enable/disable audio cues
+}
+```
+
+### Video Quality Options
+- **Target**: 1080p @ 240fps (optimal for race timing)
+- **Fallback**: 1080p @ 120fps (if 240fps unavailable)
+- **Alternative**: 720p @ 240fps (if 1080p unavailable)
+
+## 📊 Performance Metrics
+
+### Expected Performance (iPhone 11 Pro Max)
+- **Frame Rate**: 240fps sustained
+- **Recording Duration**: Limited by storage and thermal throttling
+- **File Size**: ~2-4GB per minute at 240fps
+- **Battery Life**: ~30-45 minutes continuous recording
+- **Timing Precision**: <1ms accuracy
+
+### Real-time Monitoring
+- Live FPS measurement during recording
+- Frame count tracking
+- Elapsed time display
+- Performance indicators (green/amber/red)
+
+## 🎯 Race Timing Features
+
+### Precise Start Marking
+- Audio cue triggers exact timing marker
+- Frame-accurate start time recording
+- High-precision `performance.now()` timestamps
+
+### Frame-by-Frame Analysis
+- Each frame tagged with race time
+- Post-recording frame analysis
+- Timing data export capabilities
+
+### Sequence Control
+- Professional race start sequence
+- Randomized timing for fair starts
+- Audio cues with visual feedback
+
+## 🔧 Development
+
+### Setup Instructions
+See [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md) for complete setup guide.
+
+### Key Development Commands
 ```bash
-python create_audio_files.py
-```
-This creates basic tone-based audio files.
+# Start development server
+npm start
 
-#### Option 2: Manual Recording
-1. Use a voice recorder or audio software
-2. Record the phrases clearly and consistently
-3. Save as WAV files in the `audio/` directory
-4. Ensure consistent volume levels
+# Run on iOS device
+npx react-native run-ios --device
 
-#### Option 3: Online TTS Services
-Use online text-to-speech services to generate professional-quality audio files.
+# Install pods after dependency changes
+cd ios && pod install && cd ..
 
-## Usage Guide
-
-### Basic Operation
-
-1. **Launch the Application**
-   - Run `python main.py`
-   - The application will automatically detect available cameras
-
-2. **Camera Setup**
-   - Select your camera from the dropdown menu
-   - Click "Refresh" if your camera isn't detected
-   - Position your camera to capture the race start line
-
-3. **Configure Settings**
-   - Set countdown duration (3-10 seconds)
-   - Choose video quality (High/Medium/Low)
-   - Enable/disable countdown audio
-   - Configure auto-save settings
-
-4. **Start Recording**
-   - Click "Start Sequence" to begin the countdown
-   - During the start sequence and recording, the camera feed is hidden and replaced with a "Recording in Progress" message
-   - The recording time is displayed in real-time
-   - At "GO!", recording automatically starts and marks the start frame
-   - The start time is precisely captured and displayed
-
-5. **Stop Recording**
-   - Click "Stop Recording" when the race is finished
-   - The finish time is marked and duration is calculated
-   - Video is automatically saved with timing markers
-
-### Advanced Features
-
-#### Recording Display
-- **Hidden Camera Feed**: During start sequence and recording, the camera feed is hidden to prevent distraction
-- **Recording Message**: Displays "Recording in Progress" with real-time elapsed time
-- **Visual Feedback**: Red border and prominent text indicate active recording
-- **Automatic Restoration**: Camera feed automatically returns when recording stops
-
-#### Timing Markers
-- **Start Marker**: Automatically added to the first frame with timestamp
-- **Finish Marker**: Added when recording stops
-- **Duration Calculation**: Precise timing between start and finish
-- **Metadata File**: JSON file with complete timing information
-
-#### Video Output
-- **Format**: MP4 with H.264 encoding
-- **Quality Options**: 
-  - High: 1920x1080 @ 30fps
-  - Medium: 1280x720 @ 30fps
-  - Low: 854x480 @ 30fps
-- **File Location**: `~/Pictures/RaceTimer/` directory with timestamped filenames
-
-#### Recent Recordings
-- View list of recent recordings with timing information
-- Access to start time, finish time, and duration for each recording
-
-## File Structure
-
-```
-VideoStart/
-├── main.py                    # PyQt6 application entry point
-├── race_timer_app.py          # PyQt6 main application window
-├── camera_thread.py           # Camera capture thread
-├── countdown_widget.py        # PyQt6 countdown display widget
-├── video_recorder.py          # Video recording and markers
-├── timing_markers.py          # Timing data management
-├── config_manager.py          # Configuration management
-├── webhook_server.py          # Webhook server for future features
-├── requirements.txt           # PyQt6 dependencies
-├── run_race_timer.bat         # Windows batch launcher
-├── test_installation.py       # Installation test script
-├── create_audio_files.py      # Audio file creation script
-├── README.md                  # This file
-├── audio/                     # Prerecorded audio files
-│   ├── go_to_start.wav
-│   ├── in_position.wav
-│   ├── set.wav
-│   └── start_beep.wav
-└── config.json                # Application configuration
+# Clean build
+npx react-native clean
 ```
 
-**Note**: Video recordings are automatically saved to `~/Pictures/RaceTimer/` directory.
+### Testing
+- **Unit tests**: `npm test`
+- **Device testing**: Physical iPhone 11 Pro Max required
+- **Performance testing**: Monitor FPS and frame timing accuracy
 
-## Configuration
+## 📝 Migration from Original
 
-The application automatically creates a `config.json` file with default settings. You can modify these settings:
+### Ported Features
+- ✅ Camera integration with high frame rate support
+- ✅ Start sequence with configurable timing
+- ✅ Audio system for race announcements
+- ✅ Timing markers and race measurement
+- ✅ Configuration management
+- ✅ Video recording with frame analysis
 
-### Camera Settings
-- Default camera selection
-- Resolution and frame rate
-- Auto-connect behavior
+### New Mobile Enhancements
+- 📱 Touch-optimized interface
+- 🔐 Native iOS permissions handling
+- 💾 Mobile storage management
+- 🎯 Device-specific optimizations
+- 📐 Orientation and layout management
 
-### Recording Settings
-- Default video quality
-- Countdown duration
-- Audio preferences
-- Output directory (defaults to ~/Pictures/RaceTimer/)
+### Not Yet Implemented
+- ⏳ Webhook server integration (future)
+- ⏳ Recent recordings management
+- ⏳ Advanced settings panel
+- ⏳ Video export and sharing
 
-### Webhook Settings (Future)
-- Server port and endpoint
-- Authentication configuration
-- Enable/disable webhook server
+## 🐛 Troubleshooting
 
-## Troubleshooting
+### Common Issues
 
-### Camera Issues
-- **No cameras detected**: Ensure your webcam is connected and not in use by another application
-- **Poor video quality**: Try different quality settings or check camera drivers
-- **Camera not responding**: Click "Refresh" or restart the application
+1. **Camera not found**
+   - Ensure iPhone 11 Pro Max is being used
+   - Check camera permissions in Settings
 
-### Audio Issues
-- **No audio during countdown**: Check that audio files exist in the `audio/` directory
-- **Audio files missing**: Run `python create_audio_files.py` to generate basic audio files
-- **Poor audio quality**: Replace generated audio files with higher quality recordings
+2. **240fps not available**
+   - Verify device model and iOS version
+   - Check console for available camera formats
 
-### Recording Issues
-- **Video not saving**: Check available disk space and write permissions
-- **Poor performance**: Lower video quality or close other applications
+3. **Build failures**
+   - Clean project: `npx react-native clean`
+   - Reinstall pods: `cd ios && rm -rf Pods && pod install`
 
-### General Issues
-- **Application crashes**: Check Python version compatibility
-- **Missing dependencies**: Run `pip install -r requirements.txt`
-- **Permission errors**: Run as administrator if needed
+See [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md) for detailed troubleshooting.
 
-## Development
+## 📄 License
 
-### Architecture Overview
-- **Modular Design**: Each component is separate for easy maintenance
-- **Thread-Safe**: Camera operations run in separate thread
-- **Extensible**: Easy to add webhook functionality in future
-- **Configurable**: All settings stored in JSON configuration
+This project maintains the same license as the original VideoStart application.
 
-### Adding Features
-1. **Webhook Integration**: Extend `config_manager.py` and add webhook server
-2. **Audio Support**: Integrate text-to-speech in `countdown_widget.py`
-3. **Multiple Cameras**: Enhance `camera_thread.py` for multi-camera support
-4. **Advanced Timing**: Extend `timing_markers.py` for complex race formats
+## 🤝 Contributing
 
-### Building Distribution
-```bash
-# Install PyInstaller
-pip install pyinstaller
+1. Fork the repository
+2. Create feature branch
+3. Test on iPhone 11 Pro Max
+4. Submit pull request
 
-# Create executable
-pyinstaller --onefile --windowed main.py
-```
+## 📞 Support
 
-## License
+For questions specific to the React Native version:
+- Check the setup instructions
+- Review troubleshooting guide
+- Test on actual iPhone 11 Pro Max hardware
 
-This project is provided as-is for educational and personal use.
+---
 
-## Support
-
-For issues and feature requests, please check the troubleshooting section above or create an issue in the project repository.
-
-## Future Enhancements
-
-- **Webhook Server**: HTTP endpoint for finish line integration
-- **Audio Integration**: Text-to-speech countdown and sound effects
-- **Multi-Camera Support**: Simultaneous recording from multiple cameras
-- **Advanced Timing**: Support for complex race formats and multiple participants
-- **Cloud Integration**: Upload recordings and timing data to cloud services
-- **Mobile App**: Companion app for remote control and monitoring 
+**Note**: This app requires iPhone 11 Pro Max for full 240fps functionality. Other devices may have limited capabilities. 
